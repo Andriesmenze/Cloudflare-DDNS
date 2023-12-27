@@ -9,7 +9,7 @@ It's particularly useful for maintaining DNS records for services hosted at home
 
 - **Dynamic IP Detection**: Automatically detects changes in the public IPv4 and IPv6 addresses.
 - **Cloudflare API Integration**: Utilizes the Cloudflare API to update DNS records.
-- **Flexible Configuration**: Easy-to-configure YAML file for specifying DNS records and other settings.
+- **Flexible Configuration**: Easy-to-configure YAML file for the main config and JSON for specifying DNS records.
 - **Logging and Debugging**: Detailed logging for troubleshooting and debugging.
 
 ## Setup
