@@ -2,19 +2,19 @@
 
 # Check if curl is installed
 if ! command -v curl &> /dev/null; then
-    echo "Error: curl is not installed. Please install curl (e.g., 'apk --no-cache add curl' or 'apt-get install curl')." >&2
+    echo "[error] curl is not installed. Please install curl (e.g., 'apk --no-cache add curl' or 'apt-get install curl')." >&2
     exit 1
 fi
 
 # Check if yq is installed
 if ! command -v yq &> /dev/null; then
-    echo "Error: yq is not installed. Please install yq (e.g., 'apk --no-cache add yq' or 'apt-get install yq')." >&2
+    echo "[error] yq is not installed. Please install yq (e.g., 'apk --no-cache add yq' or 'apt-get install yq')." >&2
     exit 1
 fi
 
 # Check if jq is installed
 if ! command -v jq &> /dev/null; then
-    echo "Error: jq is not installed. Please install jq (e.g., 'apk --no-cache add jq' or 'apt-get install jq')." >&2
+    echo "[error] jq is not installed. Please install jq (e.g., 'apk --no-cache add jq' or 'apt-get install jq')." >&2
     exit 1
 fi
 
@@ -55,7 +55,7 @@ log_message() {
     if [ "$log_file_size" -gt "$max_log_size" ]; then
         local backup_file="$LOG_FILE.$(date +%Y%m%d%H%M%S)"
         mv "$LOG_FILE" "$backup_file"
-        echo "Log file rotated. Old log file: $backup_file" >> "$LOG_FILE" 2>&1
+        echo "[info] Log file rotated. Old log file: $backup_file" >> "$LOG_FILE" 2>&1
     fi
 }
 
@@ -76,9 +76,9 @@ test_api_token() {
 
     # Check for errors in the response
     if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
-        echo "Error testing API token: $response"
+        echo "[error] Error testing API token: $response"
     else
-        echo "The Cloudflare API token is valid."
+        echo "[info] The Cloudflare API token is valid."
     fi
 }
 
@@ -111,9 +111,9 @@ update_dns_record() {
 
     # Check for errors in the response
     if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
-        echo "Error updating DNS record for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id: $response"
+        echo "[error] Error updating DNS record for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id: $response"
     else
-        echo "DNS record updated successfully for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id."
+        echo "[info] DNS record updated successfully for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id."
     fi
 }
 
@@ -123,22 +123,22 @@ check_and_update_record(){
     output2=""
     output3=""
     if [ "$public_ip" != "$record_content" ]; then
-        output1="Current value is different from Public IP, Updating DNS Record for record ${subdomain:+"$subdomain."}$record_name type $record_type in zone $zone_id"
+        output1="[info] Current value is different from Public IP, Updating DNS Record for record ${subdomain:+"$subdomain."}$record_name type $record_type in zone $zone_id"
         output2=$(update_dns_record "$public_ip")
         # Check for errors during DNS record update
         if [ "$output2" == *"Error"* ]; then
-            output3="Failed to update the DNS Record for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id."
+            output3="[error] Failed to update the DNS Record for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id."
         else
-            output3="Changed the DNS Record for ${subdomain:+"$subdomain."}$record_name type $record_type from $record_content to $public_ip"
+            output3="[info] Changed the DNS Record for ${subdomain:+"$subdomain."}$record_name type $record_type from $record_content to $public_ip"
         fi
     else
-        output1="Public IP is the same as current value. Skipping update for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id."
+        output1="[info] Public IP is the same as current value. Skipping update for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id."
     fi
 }
 
 # Signal handler function
 cleanup() {
-    log_message "Received termination signal. Exiting."
+    log_message "[info] Received termination signal. Exiting."
     exit 0
 }
 
@@ -146,7 +146,7 @@ cleanup() {
 trap cleanup SIGTERM SIGINT
 
 # Main loop
-log_message "Script has initialised"
+log_message "[info] Script has initialised"
 while true; do
 
     # Test the cloudflare API Token
@@ -156,9 +156,9 @@ while true; do
 
         # Retrieve the current public IPv4 and IPv6 addresses
         current_ipv4=$(get_public_ipv4)
-        log_message "Current public IPV4 address is $current_ipv4"
+        log_message "[info] Current public IPV4 address is $current_ipv4"
         current_ipv6=$(get_public_ipv6)
-        log_message "Current public IPV6 address is $current_ipv6"
+        log_message "[info] Current public IPV6 address is $current_ipv6"
 
         # Iterate through each configured DNS record
         for zone_config in "${ZONE_CONFIGS[@]}"; do
@@ -169,7 +169,7 @@ while true; do
             subdomain=$(echo "$zone_config" | jq -r '.subdomain')
             get_dns_record_value_return=$(get_dns_record_value)
             IFS=" " read -r record_content record_id <<< "$get_dns_record_value_return"
-            log_message "Retrieved DNS record value for record ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id: $record_content"
+            log_message "[info] Retrieved DNS record value for record ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id: $record_content"
 
             # Check and update the record
             case "$record_type" in
@@ -191,13 +191,13 @@ while true; do
                     ;;
                 *)
                     # Log if the record type is unsupported
-                    log_message "Unsupported record type: $record_type. Skipping update for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id."
+                    log_message "[error] Unsupported record type: $record_type. Skipping update for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id."
                     continue
                     ;;
             esac
         done
     fi
     # Sleep for the specified interval before the next run
-    log_message "End of the run. Sleeping for $SLEEP_INTERVAL seconds."
+    log_message "[info] End of the run. Sleeping for $SLEEP_INTERVAL seconds."
     sleep $SLEEP_INTERVAL
 done
