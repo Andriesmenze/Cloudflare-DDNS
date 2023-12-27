@@ -15,28 +15,29 @@ It's particularly useful for maintaining DNS records for services hosted at home
 ## Setup
 
 1. Clone the repository:
-
+```bash
     git clone https://github.com/yourusername/cloudflare-dynamic-dns.git
-
+```
 2. Navigate to the project directory:
-
+```bash
     cd cloudflare-dynamic-dns
-
+```
 3. Build the image:
-
+```bash
     docker buildx build -t cloudflare-ddns .
-
+```
 4. Start the container and mount the config an log folder to a docker volume or a folder on the host:
-
+```bash
     docker run \
     -v /your/path/or/volume:/config \
     -v /your/path/or/volume:/var/log/cloudflare-ddns \
     --network host \
     docker.io/library/cloudflare-ddns
-
+```
 5. Edit the cloudflare-ddns-config.yaml and dns-records.json file in the config folder and restart the container
 
 ### Cloudflare DDNS Configuration (`cloudflare-ddns-config.yaml`)
+```yaml
 # File: cloudflare-ddns-config.yaml
 
 # Cloudflare API Token
@@ -51,8 +52,10 @@ SLEEP_INTERVAL: 900
 # Log file location
 # Can also be set with the ENV Variable LOG_FILE_LOCATION
 LOG_FILE: "/var/log/cloudflare-ddns/update_dns.log"
+```
 
 ### DNS Records Configuration (dns-records.json)
+```json
 {
   "ZONE_CONFIGS": [
     {
@@ -78,3 +81,4 @@ LOG_FILE: "/var/log/cloudflare-ddns/update_dns.log"
     }
   ]
 }
+```
