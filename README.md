@@ -14,7 +14,7 @@ It's particularly useful for maintaining DNS records for services hosted at home
 
 ## Setup
 
-**For amd64 and arm64/aarch64:**
+**For linux/amd64 and linux/arm64:**
 1. Pull the image from Github:
 ```bash
 docker pull ghcr.io/andriesmenze/cloudflare-ddns:latest
