@@ -54,7 +54,7 @@ SLEEP_INTERVAL: 900
 LOG_FILE: "/var/log/cloudflare-ddns/update_dns.log"
 ```
 
-## DNS Records Configuration (dns-records.json)
+## DNS Records Configuration (`dns-records.json`)
 ```json
 {
   "ZONE_CONFIGS": [
