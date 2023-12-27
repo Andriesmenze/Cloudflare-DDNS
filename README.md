@@ -2,7 +2,7 @@
 
 ## Overview
 
-This script is designed to update DNS records on Cloudflare dynamically based on changes in your public IP address.
+This ligthweight image runs a script that is designed to update DNS records on Cloudflare dynamically based on changes in your public IP address.
 It's particularly useful for maintaining DNS records for services hosted at home or any environment with a dynamic IP address.
 
 ## Features
@@ -14,6 +14,22 @@ It's particularly useful for maintaining DNS records for services hosted at home
 
 ## Setup
 
+For amd64 and arm64/aarch64:
+1. Pull the image from Github:
+```bash
+docker pull ghcr.io/andriesmenze/cloudflare-ddns:latest
+```
+2. Start the container and mount the config an log folder to a docker volume or a folder on the host:
+```bash
+docker run \
+-v /your/path/or/volume:/config \
+-v /your/path/or/volume:/var/log/cloudflare-ddns \
+--network host \
+docker.io/library/cloudflare-ddns
+```
+3. Edit the cloudflare-ddns-config.yaml and dns-records.json file in the config folder and restart the container
+
+For other architectures:
 1. Clone the repository:
 ```bash
 git clone https://github.com/Andriesmenze/Cloudflare-DDNS.git
@@ -86,4 +102,4 @@ LOG_FILE: "/var/log/cloudflare-ddns/update_dns.log"
 Contributions are welcome! If you encounter issues or have suggestions, please open an issue or submit a pull request.
 
 ## License
-This project is licensed under the MIT License.
+This project is licensed under the GPL-3.0 license.
