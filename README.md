@@ -14,7 +14,7 @@ It's particularly useful for maintaining DNS records for services hosted at home
 
 ## Setup
 
-For amd64 and arm64/aarch64:
+**For amd64 and arm64/aarch64:**
 1. Pull the image from Github:
 ```bash
 docker pull ghcr.io/andriesmenze/cloudflare-ddns:latest
@@ -29,7 +29,7 @@ docker.io/library/cloudflare-ddns
 ```
 3. Edit the cloudflare-ddns-config.yaml and dns-records.json file in the config folder and restart the container
 
-For other architectures:
+**For other architectures:**
 1. Clone the repository:
 ```bash
 git clone https://github.com/Andriesmenze/Cloudflare-DDNS.git
