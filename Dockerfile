@@ -21,8 +21,11 @@ ENV TZ="Europe/Amsterdam"
 # Set the working directory
 WORKDIR /app
 
+# Switch to Bash
+RUN Bash
+
 # Setting Entrypoint
 ENTRYPOINT ["/bin/bash"]
 
 # Execute the script when the container starts
-SHELL [ "/bin/bash", "/app/update_dns.sh"]
+CMD ["/app/update_dns.sh"]
