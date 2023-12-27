@@ -126,7 +126,7 @@ check_and_update_record(){
         output1="[info] Current value is different from Public IP, Updating DNS Record for record ${subdomain:+"$subdomain."}$record_name type $record_type in zone $zone_id"
         output2=$(update_dns_record "$public_ip")
         # Check for errors during DNS record update
-        if [ "$output2" == *"Error"* ]; then
+        if [[ "$output2" == *"Error"* ]]; then
             output3="[error] Failed to update the DNS Record for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id."
         else
             output3="[info] Changed the DNS Record for ${subdomain:+"$subdomain."}$record_name type $record_type from $record_content to $public_ip"
@@ -152,7 +152,7 @@ while true; do
     # Test the cloudflare API Token
     token_status=$(test_api_token)
     log_message "$token_status"
-    if [ "$token_status" != *"Error"* ]; then
+    if [[ "$token_status" != *"Error"* ]]; then
 
         # Retrieve the current public IPv4 and IPv6 addresses
         current_ipv4=$(get_public_ipv4)
