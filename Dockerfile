@@ -25,4 +25,4 @@ WORKDIR /app
 ENTRYPOINT ["/bin/bash"]
 
 # Execute the script when the container starts
-CMD ["/app/update_dns.sh"]
+SHELL [ "/bin/bash", "/app/update_dns.sh"]
