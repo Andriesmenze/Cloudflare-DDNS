@@ -138,7 +138,7 @@ check_and_update_record(){
 
 # Signal handler function
 cleanup() {
-    log_message "Received termination signal. Exiting."
+    log_message "[info] Received termination signal. Exiting."
     exit 0
 }
 
