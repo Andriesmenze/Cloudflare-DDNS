@@ -3,6 +3,11 @@ on:
   push:
     branches:
     - test
+    paths:
+      - '**/*'
+      - '!README.md'
+      - '!LICENSE'
+      - '!/.github/workflows/**'
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
