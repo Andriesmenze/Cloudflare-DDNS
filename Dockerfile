@@ -22,7 +22,7 @@ ENV TZ="Europe/Amsterdam"
 WORKDIR /app
 
 # Setting Entrypoint
-# ENTRYPOINT ["/bin/bash"]
+ENTRYPOINT ["/bin/bash"]
 
 # Execute the script when the container starts
 CMD ["/app/update_dns.sh"]
