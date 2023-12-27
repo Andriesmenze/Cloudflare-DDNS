@@ -22,7 +22,8 @@ ENV TZ="Europe/Amsterdam"
 WORKDIR /app
 
 # Switch to Bash
-RUN Bash
+RUN ln -s bash /bin/sh.bash
+RUN mv /bin/sh.bash /bin/sh
 
 # Setting Entrypoint
 ENTRYPOINT ["/bin/bash"]
