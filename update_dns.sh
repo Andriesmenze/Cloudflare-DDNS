@@ -31,6 +31,7 @@ CONFIG="/config/cloudflare-ddns-config.yaml"
 API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
 SLEEP_INTERVAL="${SLEEP_INT:-$(yq eval '.SLEEP_INTERVAL' "$CONFIG")}"
 LOG_FILE="${LOG_FILE_LOCATION:-$(yq eval '.LOG_FILE' "$CONFIG")}"
+DRY_RUN="${DRYRUN:-$(yq eval '.DRY_RUN' "$CONFIG")}"
 
 # Load the JSON file into a variable
 DNS_RECORDS_JSON=$(cat /config/dns-records.json)
@@ -98,6 +99,11 @@ update_dns_record() {
     local new_ip=$1
     local full_record_name="${subdomain:+"$subdomain."}$record_name"
 
+    if [ "$DRY_RUN" == "true" ]; then
+        log_message "Dry run mode: Simulating DNS record update for ${subdomain:+"$subdomain."}$record_name type $record_type in zone $zone_id."
+        return  # Exit the function without making actual updates
+    fi
+
     local response=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records/$record_id" \
         -H "Authorization: Bearer $API_TOKEN" \
         -H "Content-Type: application/json" \
@@ -111,9 +117,9 @@ update_dns_record() {
 
     # Check for errors in the response
     if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
-        echo "[error] Error updating DNS record for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id: $response"
+        echo "[error] Error updating DNS record for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id: $response"
     else
-        echo "[info] DNS record updated successfully for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id."
+        echo "[info] DNS record updated successfully for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id."
     fi
 }
 

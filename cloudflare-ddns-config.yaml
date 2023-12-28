@@ -12,3 +12,7 @@ SLEEP_INTERVAL: 900
 # Log file location
 # Can also be set with the ENV Variable LOG_FILE_LOCATION
 LOG_FILE: "/var/log/cloudflare-ddns/update_dns.log"
+
+# Dry run mode (true or false)
+# Can also be set with the ENV Variable DRYRUN
+DRY_RUN: "false"
