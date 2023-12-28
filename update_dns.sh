@@ -132,7 +132,7 @@ get_dns_record_value() {
         -H "Authorization: Bearer $API_TOKEN" \
         -H "Content-Type: application/json")
 
-    echo "$(jq -r '.result[] | "\(.content) \(.id)"' <<< "$response")"
+    echo "$(jq -r '.result[] | "\(.content) \(.id) \(.zone_name)"' <<< "$response")"
 }
 
 # Function to update DNS record
@@ -211,25 +211,24 @@ while true; do
         for zone_config in "${ZONE_CONFIGS[@]}"; do
             zone_id=$(echo "$zone_config" | jq -r '.zone_id')
             record_type=$(echo "$zone_config" | jq -r '.record_type')
-            record_name=$(echo "$zone_config" | jq -r '.record_name')
             proxied=$(echo "$zone_config" | jq -r '.proxied')
             ttl=$(echo "$zone_config" | jq -r '.ttl')
             subdomain=$(echo "$zone_config" | jq -r '.subdomain')
-
-            # Check if ttl is not set and assign a default value of 1
-            log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to 1(Auto)"
-            [ -z "$ttl" ] && ttl=1
 
             # Get DNS record value
             get_dns_record_value_return=$(get_dns_record_value)
             if [ -z "$get_dns_record_value_return" ]; then
                 error_message=$(echo "$response" | jq -r '.errors[0].message')
                 log_message "[error] $error_message"
-                log_message "[error] Failed to retrieve DNS record value for record ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Skipping record update."
+                log_message "[error] Failed to retrieve DNS record value for record type $record_type in Zone $zone_id. Skipping record update."
                 continue
             fi
-            IFS=" " read -r record_content record_id <<< "$get_dns_record_value_return"
+            IFS=" " read -r record_content record_id record_name<<< "$get_dns_record_value_return"
             log_message "[info] Retrieved DNS record value for record ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id: $record_content"
+
+            # Check if ttl is not set and assign a default value of 1
+            log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to 1(Auto)"
+            [ -z "$ttl" ] && ttl=1
 
             # Check and update the record
             case "$record_type" in

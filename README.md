@@ -80,12 +80,9 @@ https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids/
 Record type.
 Can be A for IPV4 or AAAA for IPV6.
 
-**record_name**
-DNS record name with a max of 255 character.
-
 **subdomain**
 The subdomain is the optional part of your domain that comes before the main domain.
-If you're configuring a record for the main domain, you can leave this field empty
+If you're configuring a record for the root domain, you can leave this field empty
 
 **proxied**
 Whether the record is being proxied through cloudflare to receiving the performance and security benefits of Cloudflare.
@@ -101,7 +98,6 @@ Setting to 1 means 'automatic'. Value must be between 60 and 86400, with the min
     {
       "zone_id": "ZONE_ID_1",
       "record_type": "A",
-      "record_name": "example.com",
       "subdomain": "",
       "proxied": "true",
       "ttl": "1"
@@ -109,7 +105,6 @@ Setting to 1 means 'automatic'. Value must be between 60 and 86400, with the min
     {
       "zone_id": "ZONE_ID_2",
       "record_type": "AAAA",
-      "record_name": "example.org",
       "subdomain": "",
       "proxied": "false",
       "ttl": "1"
@@ -117,7 +112,6 @@ Setting to 1 means 'automatic'. Value must be between 60 and 86400, with the min
     {
       "zone_id": "ZONE_ID_2",
       "record_type": "AAAA",
-      "record_name": "example.org",
       "subdomain": "www",
       "proxied": "true",
       "ttl": "1"
