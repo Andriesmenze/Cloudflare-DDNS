@@ -216,6 +216,10 @@ while true; do
             ttl=$(echo "$zone_config" | jq -r '.ttl')
             subdomain=$(echo "$zone_config" | jq -r '.subdomain')
 
+            # Check if ttl is not set and assign a default value of 1
+            log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to 1(Auto)"
+            [ -z "$ttl" ] && ttl=1
+
             # Get DNS record value
             get_dns_record_value_return=$(get_dns_record_value)
             if [ -z "$get_dns_record_value_return" ]; then
