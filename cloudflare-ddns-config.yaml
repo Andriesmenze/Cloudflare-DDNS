@@ -2,17 +2,17 @@
 
 # Cloudflare API Token
 # For more information visit https://developers.cloudflare.com/fundamentals/api/get-started/create-token/
-# Can also be set with the ENV Variable CLOUDFLARE_API_TOKEN
+# Can also be set/overridden with the ENV Variable CLOUDFLARE_API_TOKEN
 API_TOKEN: "YOUR_CLOUDFLARE_API_TOKEN"
 
 # Sleep Interval in seconds
-# Can also be set with the ENV Variable SLEEP_INT
+# Can also be set/overridden with the ENV Variable SLEEP_INT
 SLEEP_INTERVAL: 900
 
 # Log file location
-# Can also be set with the ENV Variable LOG_FILE_LOCATION
+# Can also be set/overridden with the ENV Variable LOG_FILE_LOCATION
 LOG_FILE: "/var/log/cloudflare-ddns/update_dns.log"
 
 # Dry run mode (true or false)
-# Can also be set with the ENV Variable DRYRUN
+# Can also be set/overridden with the ENV Variable DRYRUN
 DRY_RUN: "false"
