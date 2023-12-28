@@ -71,6 +71,30 @@ LOG_FILE: "/var/log/cloudflare-ddns/update_dns.log"
 ```
 
 ## DNS Records Configuration (`dns-records.json`)
+
+**zone_id**
+zone identifier.
+https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids/
+
+**record_type**
+Record type.
+Can be A for IPV4 or AAAA for IPV6.
+
+**record_name**
+DNS record name with a max of 255 character.
+
+**subdomain**
+The subdomain is the optional part of your domain that comes before the main domain.
+If you're configuring a record for the main domain, you can leave this field empty
+
+**proxied**
+Whether the record is being proxied through cloudflare to receiving the performance and security benefits of Cloudflare.
+Can be true or false.
+
+**ttl**
+Time To Live (TTL) of the DNS record in seconds, When not specified it defaults to 1.
+Setting to 1 means 'automatic'. Value must be between 60 and 86400, with the minimum reduced to 30 for Enterprise zones.
+
 ```json
 {
   "ZONE_CONFIGS": [
@@ -79,21 +103,24 @@ LOG_FILE: "/var/log/cloudflare-ddns/update_dns.log"
       "record_type": "A",
       "record_name": "example.com",
       "subdomain": "",
-      "proxied": "true"
+      "proxied": "true",
+      "ttl": "1"
     },
     {
       "zone_id": "ZONE_ID_2",
       "record_type": "AAAA",
       "record_name": "example.org",
       "subdomain": "",
-      "proxied": "false"
+      "proxied": "false",
+      "ttl": "1"
     },
     {
       "zone_id": "ZONE_ID_2",
       "record_type": "AAAA",
       "record_name": "example.org",
       "subdomain": "www",
-      "proxied": "true"
+      "proxied": "true",
+      "ttl": "1"
     }
   ]
 }
