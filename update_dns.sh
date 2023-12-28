@@ -28,6 +28,7 @@ fi
 
 # Source settings from the configuration file
 CONFIG="/config/cloudflare-ddns-config.yaml"
+EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
 API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
 SLEEP_INTERVAL="${SLEEP_INT:-$(yq eval '.SLEEP_INTERVAL' "$CONFIG")}"
 LOG_FILE="${LOG_FILE_LOCATION:-$(yq eval '.LOG_FILE' "$CONFIG")}"
@@ -59,6 +60,46 @@ log_message() {
         echo "[info] Log file rotated. Old log file: $backup_file" >> "$LOG_FILE" 2>&1
     fi
 }
+
+# Check if the config file is missing (new) values and add them
+if ! yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" | yq eval 'has("")' - 2>/dev/null; then
+    log_message "[info] Adding missing or new values to the config file."
+
+    # Backup old config file
+    timestamp=$(date +"%Y%m%d%H%M%S")
+    cp "$CONFIG" "$CONFIG.bak.$timestamp"
+    log_message "[info] Backup created: $CONFIG.bak.$timestamp"
+    
+    # Create a temporary JSON file
+    yaml2json "$EXAMPLE_CONFIG" > "$CONFIG.tmp.json"
+    
+    # Track missing keys
+    missing_keys=$(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted - .orig' "$EXAMPLE_CONFIG" "$CONFIG" | tr -d '[:space:]')
+
+    # Merge and update the config file
+    if yq eval '. as $item ireduce ({}; . + $item)' "$CONFIG.tmp.json" "$CONFIG" > "$CONFIG.tmp.json" && mv "$CONFIG.tmp.json" "$CONFIG"; then
+        log_message "[info] Configuration file updated successfully."
+    else
+        log_message "[error] Failed to update the configuration file."
+    fi
+    
+    # Convert and overwrite the config file to YAML
+    if json2yaml "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"; then
+        log_message "[info] Configuration file converted to YAML successfully."
+    else
+        log_message "[error] Failed to convert the configuration file to YAML."
+    fi
+    
+    # Remove the temporary JSON file
+    rm "$CONFIG.tmp.json"
+
+    # Log missing keys
+    if [ -n "$missing_keys" ]; then
+        log_message "[error] Missing keys: $missing_keys"
+    fi
+else
+    log_message "[info] Configuration file is up to date. No missing or new values detected."
+fi
 
 # Function to get the current public IPv4 address
 get_public_ipv4() {
