@@ -111,7 +111,7 @@ update_dns_record() {
         --data '{
             "content": "'$new_ip'",
             "name": "'$full_record_name'",
-            "proxied": "'$proxied'",
+            "proxied": '$proxied',
             "type": "'$record_type'",
             "ttl": "'$ttl'"
         }')
@@ -131,6 +131,16 @@ check_and_update_record(){
     output3=""
     if [ "$public_ip" != "$record_content" ]; then
         output1="[info] Current value is different from Public IP, Updating DNS Record for record ${subdomain:+"$subdomain."}$record_name type $record_type in zone $zone_id"
+        # Check if proxied is not set and assign a default value of true
+        if [ -z "$proxied" ] || [ "$proxied" = "null" ]; then
+            log_message "[info] proxied not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to true"
+            proxied="true"
+        fi
+        # Check if ttl is not set and assign a default value of 1
+        if [ -z "$ttl" ] || [ "$ttl" = "null" ]; then
+            log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to 1(Auto)"
+            ttl="1"
+        fi
         output2=$(update_dns_record "$public_ip")
         # Check for errors during DNS record update
         if [[ "$output2" == *"Error"* ]]; then
@@ -206,18 +216,6 @@ while true; do
             fi
             IFS=" " read -r record_content record_id record_name<<< "$get_dns_record_value_return"
             log_message "[info] Retrieved DNS record value for record ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id: $record_content"
-
-            # Check if proxied is not set and assign a default value of true
-            if [ -z "$proxied" ] || [ "$proxied" = "null" ]; then
-                log_message "[info] proxied not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to true"
-                proxied="true"
-            fi
-
-            # Check if ttl is not set and assign a default value of 1
-            if [ -z "$ttl" ] || [ "$ttl" = "null" ]; then
-                log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to 1(Auto)"
-                ttl="1"
-            fi
 
             # Check and update the record
             case "$record_type" in
