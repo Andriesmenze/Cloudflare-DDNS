@@ -169,8 +169,16 @@ cleanup() {
 trap cleanup SIGTERM SIGINT
 
 # Check if the config file is missing (new) values
-if ! diff -q <(yq eval . "$EXAMPLE_CONFIG") <(yq eval . "$CONFIG") > /dev/null; then
+if [ "$(yq eval 'keys_unsorted' "$EXAMPLE_CONFIG")" != "$(yq eval 'keys_unsorted' "$CONFIG")" ]; then
     log_message "[error] Missing (new) values detected in the configuration file."
+
+    # Get the missing keys
+    missing_keys=$(yq eval 'keys_unsorted - .orig' "$EXAMPLE_CONFIG" "$CONFIG" | tr -d '[:space:]')
+
+    # Log missing keys
+    if [ -n "$missing_keys" ]; then
+        log_message "[error] Missing keys: $missing_keys"
+    fi
 else
     log_message "[info] Configuration file is up to date, no missing or new values detected."
 fi
