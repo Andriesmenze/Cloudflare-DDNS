@@ -62,7 +62,7 @@ log_message() {
 }
 
 # Check if the config file is missing (new) values and add them
-missing_keys=$(jq -n --arg example "$EXAMPLE_CONFIG" --arg config "$CONFIG" '$example as $e | $config as $c | ($e + $c | unique) as $union | $union - ($e * $c) | keys_unsorted | join(" ")' | tr -d '[:space:]')
+missing_keys=$(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted - .orig' "$EXAMPLE_CONFIG" "$CONFIG" | tr -d '[:space:]')
 
 if [ -n "$missing_keys" ]; then
     log_message "[info] Adding missing or new values to the config file."
@@ -72,21 +72,34 @@ if [ -n "$missing_keys" ]; then
     cp "$CONFIG" "$CONFIG.bak.$timestamp"
     log_message "[info] Backup created: $CONFIG.bak.$timestamp"
 
+    # Create a temporary JSON file
+    yaml2json "$EXAMPLE_CONFIG" > "$CONFIG.tmp.json"
+    
     # Merge and update the config file
-    yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
+    if yq eval '. as $item ireduce ({}; . + $item)' "$CONFIG.tmp.json" "$CONFIG" > "$CONFIG.tmp.json" && mv "$CONFIG.tmp.json" "$CONFIG"; then
+        log_message "[info] Configuration file updated successfully."
+    else
+        log_message "[error] Failed to update the configuration file."
+    fi
+    
+    # Convert and overwrite the config file to YAML
+    if json2yaml "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"; then
+        log_message "[info] Configuration file converted to YAML successfully."
+    else
+        log_message "[error] Failed to convert the configuration file to YAML."
+    fi
+    
+    # Remove the temporary JSON file
+    rm "$CONFIG.tmp.json"
 
     # Log missing keys
     if [ -n "$missing_keys" ]; then
         log_message "[error] Missing keys: $missing_keys"
     fi
-
-    log_message "[info] Configuration file updated successfully."
-
-    # Convert and overwrite the config file to YAML
-    json2yaml "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
 else
     log_message "[info] Configuration file is up to date. No missing or new values detected."
 fi
+
 
 # Function to get the current public IPv4 address
 get_public_ipv4() {
