@@ -44,6 +44,7 @@ IFS=$'\n' read -d '' -ra ZONE_CONFIGS < <(echo "$DNS_RECORDS_JSON" | jq -c '.ZON
 log_message() {
     local timestamp
     local log_entry
+    local log_file_size
     timestamp=$(date +"%Y-%m-%d %H:%M:%S")
     log_entry="[$timestamp] $1"
 
@@ -54,7 +55,6 @@ log_message() {
     echo "$log_entry" >> "$LOG_FILE" 2>&1
     
     # Rotate log file if it exceeds a certain size (e.g., 1 MB)
-    local log_file_size
     log_file_size=$(du -b "$LOG_FILE" | cut -f1)
     local max_log_size=$((1024 * 1024))  # 1 MB
     if [ "$log_file_size" -gt "$max_log_size" ]; then
@@ -92,8 +92,8 @@ test_api_token() {
 # Function to get DNS record
 get_dns_record_value() {
     local full_record_name="${subdomain:+"$subdomain."}$record_name"
-
     local response
+
     response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$record_type&name=$full_record_name" \
         -H "Authorization: Bearer $API_TOKEN" \
         -H "Content-Type: application/json")
@@ -105,22 +105,22 @@ get_dns_record_value() {
 update_dns_record() {
     local new_ip=$1
     local full_record_name="${subdomain:+"$subdomain."}$record_name"
+    local response
 
     if [ "$DRY_RUN" == "true" ]; then
         log_message "Dry run mode: Simulating DNS record update for ${subdomain:+"$subdomain."}$record_name type $record_type in zone $zone_id."
         return  # Exit the function without making actual updates
     fi
 
-    local response
     response=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records/$record_id" \
         -H "Authorization: Bearer $API_TOKEN" \
         -H "Content-Type: application/json" \
         --data '{
-            "content": "'"$new_ip"'",
-            "name": "'"$full_record_name"'",
-            "proxied": '"$proxied"',
-            "type": "'"$record_type"'",
-            "ttl": "'"$ttl"'"
+            "content": "'$new_ip'",
+            "name": "'$full_record_name'",
+            "proxied": '$proxied',
+            "type": "'$record_type'",
+            "ttl": "'$ttl'"
         }')
 
     # Check for errors in the response
