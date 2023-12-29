@@ -32,7 +32,7 @@ EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
 API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
 SLEEP_INTERVAL="${SLEEP_INT:-$(yq eval '.SLEEP_INTERVAL' "$CONFIG")}"
 LOG_FILE="${LOG_FILE_LOCATION:-$(yq eval '.LOG_FILE' "$CONFIG")}"
-DRY_RUN="${DRYRUN:-$(yq eval '.DRY_RUN' "$CONFIG")}"
+DRY_RUN="${DRY_RUN_MODE:-$(yq eval '.DRY_RUN' "$CONFIG")}"
 
 # Load the JSON file into a variable
 DNS_RECORDS_JSON=$(cat /config/dns-records.json)
@@ -61,47 +61,16 @@ log_message() {
     fi
 }
 
-# Check if the config file is missing (new) values and add them
+# Check if the config file is missing (new) values
 check_config() {
-    if ! yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" | yq eval '.' - 2>/dev/null | grep -qF '{}'; then
-        log_message "[info] Adding missing or new values to the config file."
+    if ! yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" | yq eval '.' - 2>/dev/null; then
 
-        # Backup old config file
-        timestamp=$(date +"%Y%m%d%H%M%S")
-        cp "$CONFIG" "$CONFIG.bak.$timestamp"
-        log_message "[info] Backup created: $CONFIG.bak.$timestamp"
-        
-        # Create a temporary JSON file
-        yaml2json-cli "$EXAMPLE_CONFIG" > "$CONFIG.tmp.json"
-
-        # Track missing keys
-        missing_keys=""
-        for key in $(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted | .orig[]' "$EXAMPLE_CONFIG" "$CONFIG"); do
-            if ! yq eval "has(\"$key\")" "$CONFIG" 2>/dev/null; then
-                missing_keys="$missing_keys$key "
-            fi
-        done
-
-        # Merge and update the config file
-        if yq eval '. as $item ireduce ({}; . + $item)' "$CONFIG.tmp.json" "$CONFIG" > "$CONFIG.tmp.json" && mv "$CONFIG.tmp.json" "$CONFIG"; then
-            log_message "[info] Configuration file updated successfully."
-        else
-            log_message "[error] Failed to update the configuration file."
-        fi
-        
-        # Convert and overwrite the config file to YAML
-        if yaml-json-cli "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"; then
-            log_message "[info] Configuration file converted to YAML successfully."
-        else
-            log_message "[error] Failed to convert the configuration file to YAML."
-        fi
-        
-        # Remove the temporary JSON file
-        rm "$CONFIG.tmp.json"
+        # Track missing values
+        missing_values=$(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted - .orig' "$EXAMPLE_CONFIG" "$CONFIG" | tr -d '[:space:]')
 
         # Log missing keys
-        if [ -n "$missing_keys" ]; then
-            log_message "[error] Missing keys: $missing_keys"
+        if [ -n "$missing_values" ]; then
+            log_message "[info] Your condfig has Missing (new) values: $missing_values"
         fi
     else
         log_message "[info] Configuration file is up to date. No missing or new values detected."
