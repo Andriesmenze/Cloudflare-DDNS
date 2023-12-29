@@ -62,7 +62,7 @@ log_message() {
 }
 
 # Check if the config file is missing (new) values and add them
-if ! yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" | yq eval 'has("")' - 2>/dev/null; then
+if ! yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" | yq eval 'has("API_TOKEN") or has("SLEEP_INTERVAL") or has("LOG_FILE") or has("DRY_RUN")' - 2>/dev/null; then
     log_message "[info] Adding missing or new values to the config file."
 
     # Backup old config file
@@ -74,7 +74,7 @@ if ! yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" | 
     yaml2json "$EXAMPLE_CONFIG" > "$CONFIG.tmp.json"
     
     # Track missing keys
-    missing_keys=$(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted - .orig' "$EXAMPLE_CONFIG" "$CONFIG" | tr -d '[:space:]')
+    missing_keys=$(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted - . * .orig' "$EXAMPLE_CONFIG" "$CONFIG" | tr -d '[:space:]')
 
     # Merge and update the config file
     if yq eval '. as $item ireduce ({}; . + $item)' "$CONFIG.tmp.json" "$CONFIG" > "$CONFIG.tmp.json" && mv "$CONFIG.tmp.json" "$CONFIG"; then
@@ -100,6 +100,7 @@ if ! yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" | 
 else
     log_message "[info] Configuration file is up to date. No missing or new values detected."
 fi
+
 
 # Function to get the current public IPv4 address
 get_public_ipv4() {
