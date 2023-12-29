@@ -62,45 +62,31 @@ log_message() {
 }
 
 # Check if the config file is missing (new) values and add them
-if ! yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" | yq eval 'has("API_TOKEN") or has("SLEEP_INTERVAL") or has("LOG_FILE") or has("DRY_RUN")' - 2>/dev/null; then
+example_keys=$(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted' "$EXAMPLE_CONFIG" | tr -d '[:space:]')
+config_keys=$(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted' "$CONFIG" | tr -d '[:space:]')
+
+missing_keys=$(comm -23 <(echo "$example_keys") <(echo "$config_keys"))
+if [ -n "$missing_keys" ]; then
     log_message "[info] Adding missing or new values to the config file."
 
     # Backup old config file
     timestamp=$(date +"%Y%m%d%H%M%S")
     cp "$CONFIG" "$CONFIG.bak.$timestamp"
     log_message "[info] Backup created: $CONFIG.bak.$timestamp"
-    
-    # Create a temporary JSON file
-    yaml2json "$EXAMPLE_CONFIG" > "$CONFIG.tmp.json"
-    
-    # Track missing keys
-    missing_keys=$(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted - . * .orig' "$EXAMPLE_CONFIG" "$CONFIG" | tr -d '[:space:]')
 
     # Merge and update the config file
-    if yq eval '. as $item ireduce ({}; . + $item)' "$CONFIG.tmp.json" "$CONFIG" > "$CONFIG.tmp.json" && mv "$CONFIG.tmp.json" "$CONFIG"; then
-        log_message "[info] Configuration file updated successfully."
-    else
-        log_message "[error] Failed to update the configuration file."
-    fi
+    yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
     
-    # Convert and overwrite the config file to YAML
-    if json2yaml "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"; then
-        log_message "[info] Configuration file converted to YAML successfully."
-    else
-        log_message "[error] Failed to convert the configuration file to YAML."
-    fi
-    
-    # Remove the temporary JSON file
-    rm "$CONFIG.tmp.json"
-
     # Log missing keys
-    if [ -n "$missing_keys" ]; then
-        log_message "[error] Missing keys: $missing_keys"
-    fi
+    log_message "[error] Missing keys: $missing_keys"
+    
+    log_message "[info] Configuration file updated successfully."
+
+    # Convert and overwrite the config file to YAML
+    json2yaml "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
 else
     log_message "[info] Configuration file is up to date. No missing or new values detected."
 fi
-
 
 # Function to get the current public IPv4 address
 get_public_ipv4() {
