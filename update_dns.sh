@@ -42,12 +42,9 @@ IFS=$'\n' read -d '' -ra ZONE_CONFIGS < <(echo "$DNS_RECORDS_JSON" | jq -c '.ZON
 
 # Function to log messages and echo to the console
 log_message() {
-    local timestamp
-    local log_entry
-    local log_file_size
-    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-    log_entry="[$timestamp] $1"
-
+    local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    local log_entry="[$timestamp] $1"
+    
     # Print log entry to console
     echo "$log_entry"
     
@@ -55,11 +52,10 @@ log_message() {
     echo "$log_entry" >> "$LOG_FILE" 2>&1
     
     # Rotate log file if it exceeds a certain size (e.g., 1 MB)
-    log_file_size=$(du -b "$LOG_FILE" | cut -f1)
+    local log_file_size=$(du -b "$LOG_FILE" | cut -f1)
     local max_log_size=$((1024 * 1024))  # 1 MB
     if [ "$log_file_size" -gt "$max_log_size" ]; then
-        local backup_file
-        backup_file="$LOG_FILE.$(date +%Y%m%d%H%M%S)"
+        local backup_file="$LOG_FILE.$(date +%Y%m%d%H%M%S)"
         mv "$LOG_FILE" "$backup_file"
         echo "[info] Log file rotated. Old log file: $backup_file" >> "$LOG_FILE" 2>&1
     fi
@@ -77,8 +73,7 @@ get_public_ipv6() {
 
 # Function to test Cloudflare API token
 test_api_token() {
-    local response
-    response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/user/tokens/verify" \
+    local response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/user/tokens/verify" \
         -H "Authorization: Bearer $API_TOKEN")
 
     # Check for errors in the response
@@ -92,33 +87,31 @@ test_api_token() {
 # Function to get DNS record
 get_dns_record_value() {
     local full_record_name="${subdomain:+"$subdomain."}$record_name"
-    local response
 
-    response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$record_type&name=$full_record_name" \
+    local response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$record_type&name=$full_record_name" \
         -H "Authorization: Bearer $API_TOKEN" \
         -H "Content-Type: application/json")
 
-    jq -r '.result[] | "\(.content) \(.id) \(.zone_name)"' <<< "$response"
+    echo "$(jq -r '.result[] | "\(.content) \(.id) \(.zone_name)"' <<< "$response")"
 }
 
 # Function to update DNS record
 update_dns_record() {
     local new_ip=$1
     local full_record_name="${subdomain:+"$subdomain."}$record_name"
-    local response
 
     if [ "$DRY_RUN" == "true" ]; then
         log_message "Dry run mode: Simulating DNS record update for ${subdomain:+"$subdomain."}$record_name type $record_type in zone $zone_id."
         return  # Exit the function without making actual updates
     fi
 
-    response=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records/$record_id" \
+    local response=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records/$record_id" \
         -H "Authorization: Bearer $API_TOKEN" \
         -H "Content-Type: application/json" \
         --data '{
             "content": "'$new_ip'",
             "name": "'$full_record_name'",
-            "proxied": "'$proxied'",
+            "proxied": '$proxied',
             "type": "'$record_type'",
             "ttl": "'$ttl'"
         }')
@@ -248,5 +241,5 @@ while true; do
     fi
     # Sleep for the specified interval before the next run
     log_message "[info] End of the run. Sleeping for $SLEEP_INTERVAL seconds."
-    sleep "$SLEEP_INTERVAL"
+    sleep $SLEEP_INTERVAL
 done
