@@ -111,7 +111,7 @@ update_dns_record() {
         --data '{
             "content": "'$new_ip'",
             "name": "'$full_record_name'",
-            "proxied": '$proxied',
+            "proxied": "'$proxied'",
             "type": "'$record_type'",
             "ttl": "'$ttl'"
         }')
@@ -208,10 +208,12 @@ while true; do
             log_message "[info] Retrieved DNS record value for record ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id: $record_content"
 
             # Check if ttl is not set and assign a default value of 1
+            log_message "[debug] Before ttl check: ttl='$ttl'"
             if [ -z "$ttl" ]; then
                 log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to 1(Auto)"
                 ttl="1"
             fi
+            log_message "[debug] After ttl check: ttl='$ttl'"
 
             # Check and update the record
             case "$record_type" in
