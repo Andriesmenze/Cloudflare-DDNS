@@ -62,7 +62,7 @@ log_message() {
 }
 
 # Check if the config file is missing (new) values and add them
-missing_keys=$(jq -n --argfile example "$EXAMPLE_CONFIG" --argfile config "$CONFIG" '$example as $e | $config as $c | ($e + $c | unique) as $union | $union - ($e * $c) | keys_unsorted | join(" ")' | tr -d '[:space:]')
+missing_keys=$(jq -n --arg example "$EXAMPLE_CONFIG" --arg config "$CONFIG" '$example as $e | $config as $c | ($e + $c | unique) as $union | $union - ($e * $c) | keys_unsorted | join(" ")' | tr -d '[:space:]')
 
 if [ -n "$missing_keys" ]; then
     log_message "[info] Adding missing or new values to the config file."
@@ -76,7 +76,9 @@ if [ -n "$missing_keys" ]; then
     yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
 
     # Log missing keys
-    log_message "[error] Missing keys: $missing_keys"
+    if [ -n "$missing_keys" ]; then
+        log_message "[error] Missing keys: $missing_keys"
+    fi
 
     log_message "[info] Configuration file updated successfully."
 
@@ -85,7 +87,6 @@ if [ -n "$missing_keys" ]; then
 else
     log_message "[info] Configuration file is up to date. No missing or new values detected."
 fi
-
 
 # Function to get the current public IPv4 address
 get_public_ipv4() {
