@@ -210,7 +210,7 @@ while true; do
             # Check if ttl is not set and assign a default value of 1
             if [ -z "$ttl" ]; then
                 log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to 1(Auto)"
-                ttl=1
+                ttl="1"
             fi
 
             # Check and update the record
