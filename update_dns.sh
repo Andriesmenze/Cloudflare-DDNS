@@ -72,7 +72,7 @@ check_config() {
         log_message "[info] Backup created: $CONFIG.bak.$timestamp"
         
         # Create a temporary JSON file
-        yaml2json "$EXAMPLE_CONFIG" > "$CONFIG.tmp.json"
+        yaml2json-cli "$EXAMPLE_CONFIG" > "$CONFIG.tmp.json"
 
         # Track missing keys
         missing_keys=""
@@ -90,7 +90,7 @@ check_config() {
         fi
         
         # Convert and overwrite the config file to YAML
-        if json2yaml "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"; then
+        if yaml-json-cli "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"; then
             log_message "[info] Configuration file converted to YAML successfully."
         else
             log_message "[error] Failed to convert the configuration file to YAML."

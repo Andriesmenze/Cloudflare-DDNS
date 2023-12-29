@@ -13,7 +13,10 @@ COPY update_dns.sh cloudflare-ddns-config.yaml dns-records.json /app/
 RUN chmod +x /app/update_dns.sh
 
 # Install required packages
-RUN apk add --no-cache curl bash yq jq tzdata
+RUN apk add --no-cache curl bash npm yq jq tzdata
+
+# Install yaml-json-cli
+RUN npm install -g yaml-json-cli
 
 # Set Timezone from ENV Variable
 ENV TZ="Europe/Amsterdam"
