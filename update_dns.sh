@@ -62,10 +62,8 @@ log_message() {
 }
 
 # Check if the config file is missing (new) values and add them
-example_keys=$(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted' "$EXAMPLE_CONFIG" | tr -d '[:space:]')
-config_keys=$(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted' "$CONFIG" | tr -d '[:space:]')
+missing_keys=$(jq -n --argfile example "$EXAMPLE_CONFIG" --argfile config "$CONFIG" '$example as $e | $config as $c | ($e + $c | unique) as $union | $union - ($e * $c) | keys_unsorted | join(" ")' | tr -d '[:space:]')
 
-missing_keys=$(comm -23 <(echo "$example_keys") <(echo "$config_keys"))
 if [ -n "$missing_keys" ]; then
     log_message "[info] Adding missing or new values to the config file."
 
@@ -76,10 +74,10 @@ if [ -n "$missing_keys" ]; then
 
     # Merge and update the config file
     yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" > "$CONFIG.tmp" && mv "$CONFIG.tmp" "$CONFIG"
-    
+
     # Log missing keys
     log_message "[error] Missing keys: $missing_keys"
-    
+
     log_message "[info] Configuration file updated successfully."
 
     # Convert and overwrite the config file to YAML
@@ -87,6 +85,7 @@ if [ -n "$missing_keys" ]; then
 else
     log_message "[info] Configuration file is up to date. No missing or new values detected."
 fi
+
 
 # Function to get the current public IPv4 address
 get_public_ipv4() {
