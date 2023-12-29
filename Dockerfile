@@ -12,8 +12,11 @@ COPY update_dns.sh cloudflare-ddns-config.yaml dns-records.json /app/
 # Make the script executable
 RUN chmod +x /app/update_dns.sh
 
+# Updating package repository
+RUN apk update
+
 # Install required packages
-RUN apk add --no-cache curl bash npm yq jq tzdata
+RUN apk add --no-cache curl bash nodejs npm yq jq tzdata
 
 # Install yaml-json-cli
 RUN npm install -g yaml-json-cli
