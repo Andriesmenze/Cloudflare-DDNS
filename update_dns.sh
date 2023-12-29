@@ -63,14 +63,14 @@ log_message() {
 
 # Check if the config file is missing (new) values
 check_config() {
-    if ! yq eval '. as $item ireduce ({}; . + $item)' "$EXAMPLE_CONFIG" "$CONFIG" | yq eval '.' - 2>/dev/null; then
+    if ! diff -q <(yq eval . "$EXAMPLE_CONFIG") <(yq eval . "$CONFIG") > /dev/null; then
 
-        # Track missing values
-        missing_values=$(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted - .orig' "$EXAMPLE_CONFIG" "$CONFIG" | tr -d '[:space:]')
+        # Track missing keys
+        missing_keys=$(yq eval '. as $item ireduce ({}; . + $item) | keys_unsorted - .orig' "$EXAMPLE_CONFIG" "$CONFIG" | tr -d '[:space:]')
 
         # Log missing keys
-        if [ -n "$missing_values" ]; then
-            log_message "[info] Your condfig has Missing (new) values: $missing_values"
+        if [ -n "$missing_keys" ]; then
+            log_message "[error] Missing keys: $missing_keys"
         fi
     else
         log_message "[info] Configuration file is up to date. No missing or new values detected."
