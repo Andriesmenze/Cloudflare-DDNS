@@ -118,7 +118,7 @@ update_dns_record() {
         --data '{
             "content": "'$new_ip'",
             "name": "'$full_record_name'",
-            "proxied": '$proxied',
+            "proxied": "'$proxied'",
             "type": "'$record_type'",
             "ttl": "'$ttl'"
         }')
