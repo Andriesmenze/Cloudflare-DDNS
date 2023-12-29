@@ -61,15 +61,6 @@ log_message() {
     fi
 }
 
-# Check if the config file is missing (new) values
-check_config() {
-    if ! diff -q <(yq eval . "$EXAMPLE_CONFIG") <(yq eval . "$CONFIG") > /dev/null; then
-        log_message "[error] Missing or new values detected in the configuration file."
-    else
-        log_message "[info] Configuration file is up to date. No missing or new values detected."
-    fi
-}
-
 # Function to get the current public IPv4 address
 get_public_ipv4() {
     curl -s https://api.ipify.org?format=text
@@ -161,15 +152,35 @@ cleanup() {
 # Register the cleanup function to handle termination signals
 trap cleanup SIGTERM SIGINT
 
-# Main loop
-check_config
+# Check if the config file is missing (new) values
+if ! diff -q <(yq eval . "$EXAMPLE_CONFIG") <(yq eval . "$CONFIG") > /dev/null; then
+    log_message "[error] Missing or new values detected in the configuration file."
+else
+    log_message "[info] Configuration file is up to date. No missing or new values detected."
+fi
+
+# Check if config values that are not set and set defaults
+if [ -z "$DRY_RUN" ]
+    log_message "[info] Dry_Run option not set. Defaulting to false"
+    DRY_RUN="false"
+fi
+if [ -z "$SLEEP_INTERVAL" ]
+    log_message "[info] SLEEP_INTERVAL option not set. Defaulting to 900"
+    SLEEP_INTERVAL="900"
+fi
+if [ -z "$LOG_FILE" ]
+    log_message "[info] LOG_FILE option not set. Defaulting to /var/log/cloudflare-ddns/update_dns.log"
+    LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
+fi
+
 log_message "[info] Script has initialised"
+# Main loop
 while true; do
 
     # Test the cloudflare API Token
     token_status=$(test_api_token)
     log_message "$token_status"
-    if [[ "$token_status" != *"Error"* ]]; then
+    if [[ "$token_status" != *"Error"* && -n "$API_TOKEN" && "$API_TOKEN" != "YOUR_CLOUDFLARE_API_TOKEN" ]]; then
 
         # Retrieve the current public IPv4 and IPv6 addresses
         current_ipv4=$(get_public_ipv4)
@@ -197,8 +208,10 @@ while true; do
             log_message "[info] Retrieved DNS record value for record ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id: $record_content"
 
             # Check if ttl is not set and assign a default value of 1
-            log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to 1(Auto)"
-            [ -z "$ttl" ] && ttl=1
+            if [ -z "$ttl" ]; then
+                log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to 1(Auto)"
+                ttl=1
+            fi
 
             # Check and update the record
             case "$record_type" in
