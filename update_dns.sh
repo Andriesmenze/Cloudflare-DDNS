@@ -43,7 +43,7 @@ IFS=$'\n' read -d '' -ra ZONE_CONFIGS < <(echo "$DNS_RECORDS_JSON" | jq -c '.ZON
 # Function to log messages and echo to the console
 log_message() {
     local timestamp
-    local log_entry"[$timestamp] $1"
+    local log_entry
     timestamp=$(date +"%Y-%m-%d %H:%M:%S")
     log_entry="[$timestamp] $1"
 
