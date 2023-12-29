@@ -2,7 +2,7 @@
 
 ## Overview
 
-This ligthweight image runs a script that is designed to update DNS records on Cloudflare dynamically based on changes in your public IP address.
+This lightweight image runs a script that is designed to update DNS records on Cloudflare based on changes in your public IP address.  
 It's particularly useful for maintaining DNS records for services hosted at home or any environment with a dynamic IP address.
 
 ## Features
@@ -76,25 +76,23 @@ DRY_RUN: "false"
 
 ## DNS Records Configuration (`dns-records.json`)
 
-**zone_id**
-zone identifier.
-https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids/
+**zone_id**  
+https://developers.cloudflare.com/fundamentals/setup/find-account-and-zone-ids/  
 
-**record_type**
-Record type.
-Can be A for IPV4 or AAAA for IPV6.
+**record_type**  
+Can be A for IPV4 or AAAA for IPV6.  
 
-**subdomain**
-The subdomain is the optional part of your domain that comes before the main domain.
-If you're configuring a record for the root domain, you can leave this field empty
+**subdomain**  
+The subdomain is the optional part of your domain that comes before the main domain.  
+If you're configuring a record for the root domain, you can leave this field empty.  
 
-**proxied**
-Whether the record is being proxied through cloudflare to receiving the performance and security benefits of Cloudflare.
-Can be true or false.
+**proxied**  
+Whether the record is being proxied through Cloudflare to receive the performance and security benefits of Cloudflare.  
+Can be true or false.  
 
-**ttl**
-Time To Live (TTL) of the DNS record in seconds, When not specified it defaults to 1.
-Setting to 1 means 'automatic'. Value must be between 60 and 86400, with the minimum reduced to 30 for Enterprise zones.
+**ttl**  
+Time To Live (TTL) of the DNS record in seconds, When not specified it defaults to 1.  
+Setting to 1 means 'automatic'. The value must be between 60 and 86400, with the minimum reduced to 30 for Enterprise zones.  
 
 ```json
 {
