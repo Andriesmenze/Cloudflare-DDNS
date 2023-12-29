@@ -42,7 +42,10 @@ IFS=$'\n' read -d '' -ra ZONE_CONFIGS < <(echo "$DNS_RECORDS_JSON" | jq -c '.ZON
 
 # Function to log messages and echo to the console
 log_message() {
-    local timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    local timestamp
+    local log_file_size
+    local backup_file
+    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
     local log_entry="[$timestamp] $1"
     
     # Print log entry to console
@@ -52,10 +55,10 @@ log_message() {
     echo "$log_entry" >> "$LOG_FILE" 2>&1
     
     # Rotate log file if it exceeds a certain size (e.g., 1 MB)
-    local log_file_size=$(du -b "$LOG_FILE" | cut -f1)
+    log_file_size=$(du -b "$LOG_FILE" | cut -f1)
     local max_log_size=$((1024 * 1024))  # 1 MB
     if [ "$log_file_size" -gt "$max_log_size" ]; then
-        local backup_file="$LOG_FILE.$(date +%Y%m%d%H%M%S)"
+        backup_file="$LOG_FILE.$(date +%Y%m%d%H%M%S)"
         mv "$LOG_FILE" "$backup_file"
         echo "[info] Log file rotated. Old log file: $backup_file" >> "$LOG_FILE" 2>&1
     fi
@@ -73,7 +76,8 @@ get_public_ipv6() {
 
 # Function to test Cloudflare API token
 test_api_token() {
-    local response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/user/tokens/verify" \
+    local response
+    response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/user/tokens/verify" \
         -H "Authorization: Bearer $API_TOKEN")
 
     # Check for errors in the response
@@ -87,25 +91,27 @@ test_api_token() {
 # Function to get DNS record
 get_dns_record_value() {
     local full_record_name="${subdomain:+"$subdomain."}$record_name"
+    local response
 
-    local response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$record_type&name=$full_record_name" \
+    response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$record_type&name=$full_record_name" \
         -H "Authorization: Bearer $API_TOKEN" \
         -H "Content-Type: application/json")
 
-    echo "$(jq -r '.result[] | "\(.content) \(.id) \(.zone_name)"' <<< "$response")"
+    jq -r '.result[] | "\(.content) \(.id) \(.zone_name)"' <<< "$response"
 }
 
 # Function to update DNS record
 update_dns_record() {
     local new_ip=$1
     local full_record_name="${subdomain:+"$subdomain."}$record_name"
+    local response
 
     if [ "$DRY_RUN" == "true" ]; then
         log_message "Dry run mode: Simulating DNS record update for ${subdomain:+"$subdomain."}$record_name type $record_type in zone $zone_id."
         return  # Exit the function without making actual updates
     fi
 
-    local response=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records/$record_id" \
+    response=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records/$record_id" \
         -H "Authorization: Bearer $API_TOKEN" \
         -H "Content-Type: application/json" \
         --data '{
@@ -130,15 +136,15 @@ check_and_update_record(){
     output2=""
     output3=""
     if [ "$public_ip" != "$record_content" ]; then
-        output1="[info] Current value is different from Public IP, Updating DNS Record for record ${subdomain:+"$subdomain."}$record_name type $record_type in zone $zone_id"
+        output1="[info] Current value is different from Public IP, updating DNS Record for record ${subdomain:+"$subdomain."}$record_name type $record_type in zone $zone_id"
         # Check if proxied is not set and assign a default value of true
         if [ -z "$proxied" ] || [ "$proxied" = "null" ]; then
-            log_message "[info] proxied not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to true"
+            log_message "[info] proxied not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id, defaulting to true."
             proxied="true"
         fi
         # Check if ttl is not set and assign a default value of 1
         if [ -z "$ttl" ] || [ "$ttl" = "null" ]; then
-            log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to 1(Auto)"
+            log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id, defaulting to 1(Auto)."
             ttl="1"
         fi
         output2=$(update_dns_record "$public_ip")
@@ -149,13 +155,13 @@ check_and_update_record(){
             output3="[info] Changed the DNS Record for ${subdomain:+"$subdomain."}$record_name type $record_type from $record_content to $public_ip"
         fi
     else
-        output1="[info] Public IP is the same as current value. Skipping update for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id."
+        output1="[info] Public IP is the same as current value, skipping update for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id."
     fi
 }
 
 # Signal handler function
 cleanup() {
-    log_message "[info] Received termination signal. Exiting."
+    log_message "[info] Received termination signal, exiting."
     exit 0
 }
 
@@ -166,20 +172,20 @@ trap cleanup SIGTERM SIGINT
 if ! diff -q <(yq eval . "$EXAMPLE_CONFIG") <(yq eval . "$CONFIG") > /dev/null; then
     log_message "[error] Missing (new) values detected in the configuration file."
 else
-    log_message "[info] Configuration file is up to date. No missing or new values detected."
+    log_message "[info] Configuration file is up to date, no missing or new values detected."
 fi
 
 # Check if config values that are not set and set defaults
 if [ -z "$DRY_RUN" ] || [ "$DRY_RUN" = "null" ]; then
-    log_message "[info] Dry_Run option not set. Defaulting to false"
+    log_message "[info] Dry_Run option not set, defaulting to false"
     DRY_RUN="false"
 fi
 if [ -z "$SLEEP_INTERVAL" ] || [ "$SLEEP_INTERVAL" = "null" ]; then
-    log_message "[info] SLEEP_INTERVAL option not set. Defaulting to 900"
+    log_message "[info] SLEEP_INTERVAL option not set, defaulting to 900"
     SLEEP_INTERVAL="900"
 fi
 if [ -z "$LOG_FILE" ] || [ "$LOG_FILE" = "null" ]; then
-    log_message "[info] LOG_FILE option not set. Defaulting to /var/log/cloudflare-ddns/update_dns.log"
+    log_message "[info] LOG_FILE option not set, defaulting to /var/log/cloudflare-ddns/update_dns.log"
     LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
 fi
 
@@ -211,7 +217,7 @@ while true; do
             if [ -z "$get_dns_record_value_return" ]; then
                 error_message=$(echo "$response" | jq -r '.errors[0].message')
                 log_message "[error] $error_message"
-                log_message "[error] Failed to retrieve DNS record value for record type $record_type in Zone $zone_id. Skipping record update."
+                log_message "[error] Failed to retrieve DNS record value for record type $record_type in Zone $zone_id, skipping record update."
                 continue
             fi
             IFS=" " read -r record_content record_id record_name<<< "$get_dns_record_value_return"
@@ -237,13 +243,13 @@ while true; do
                     ;;
                 *)
                     # Log if the record type is unsupported
-                    log_message "[error] Unsupported record type: $record_type. Skipping update for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id."
+                    log_message "[error] Unsupported record type: $record_type, skipping update for ${subdomain:+"$subdomain."}$record_name in Zone $zone_id."
                     continue
                     ;;
             esac
         done
     fi
     # Sleep for the specified interval before the next run
-    log_message "[info] End of the run. Sleeping for $SLEEP_INTERVAL seconds."
+    log_message "[info] End of the run, sleeping for $SLEEP_INTERVAL seconds."
     sleep $SLEEP_INTERVAL
 done
