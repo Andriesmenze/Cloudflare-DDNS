@@ -160,15 +160,15 @@ else
 fi
 
 # Check if config values that are not set and set defaults
-if [ -z "$DRY_RUN" ]; then
+if [ -z "$DRY_RUN" ] || [ "$DRY_RUN" = "null" ]; then
     log_message "[info] Dry_Run option not set. Defaulting to false"
     DRY_RUN="false"
 fi
-if [ -z "$SLEEP_INTERVAL" ]; then
+if [ -z "$SLEEP_INTERVAL" ] || [ "$SLEEP_INTERVAL" = "null" ]; then
     log_message "[info] SLEEP_INTERVAL option not set. Defaulting to 900"
     SLEEP_INTERVAL="900"
 fi
-if [ -z "$LOG_FILE" ]; then
+if [ -z "$LOG_FILE" ] || [ "$LOG_FILE" = "null" ]; then
     log_message "[info] LOG_FILE option not set. Defaulting to /var/log/cloudflare-ddns/update_dns.log"
     LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
 fi
@@ -207,13 +207,17 @@ while true; do
             IFS=" " read -r record_content record_id record_name<<< "$get_dns_record_value_return"
             log_message "[info] Retrieved DNS record value for record ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id: $record_content"
 
+            # Check if proxied is not set and assign a default value of true
+            if [ -z "$proxied" ] || [ "$proxied" = "null" ]; then
+                log_message "[info] proxied not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to true"
+                proxied="true"
+            fi
+
             # Check if ttl is not set and assign a default value of 1
-            log_message "[debug] Before ttl check: ttl='$ttl'"
-            if [ -z "$ttl" ]; then
+            if [ -z "$ttl" ] || [ "$ttl" = "null" ]; then
                 log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id. Defaulting to 1(Auto)"
                 ttl="1"
             fi
-            log_message "[debug] After ttl check: ttl='$ttl'"
 
             # Check and update the record
             case "$record_type" in

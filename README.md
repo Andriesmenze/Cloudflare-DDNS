@@ -88,7 +88,7 @@ If you're configuring a record for the root domain, you can leave this field emp
 
 **proxied**  
 Whether the record is being proxied through Cloudflare to receive the performance and security benefits of Cloudflare.  
-Can be true or false.  
+Can be true or false, When not specified it defaults to true.  
 
 **ttl**  
 Time To Live (TTL) of the DNS record in seconds, When not specified it defaults to 1.  
