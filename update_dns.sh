@@ -160,15 +160,15 @@ else
 fi
 
 # Check if config values that are not set and set defaults
-if [ -z "$DRY_RUN" ]
+if [ -z "$DRY_RUN" ]; then
     log_message "[info] Dry_Run option not set. Defaulting to false"
     DRY_RUN="false"
 fi
-if [ -z "$SLEEP_INTERVAL" ]
+if [ -z "$SLEEP_INTERVAL" ]; then
     log_message "[info] SLEEP_INTERVAL option not set. Defaulting to 900"
     SLEEP_INTERVAL="900"
 fi
-if [ -z "$LOG_FILE" ]
+if [ -z "$LOG_FILE" ]; then
     log_message "[info] LOG_FILE option not set. Defaulting to /var/log/cloudflare-ddns/update_dns.log"
     LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
 fi
