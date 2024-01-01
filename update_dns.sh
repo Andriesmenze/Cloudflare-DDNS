@@ -100,7 +100,7 @@ get_zone_name(){
     if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
         echo "[error] Failed to get zone name for $zone_id: $response"
     else
-        jq -r '.result[] | "\(.name)"' <<< "$response"
+        jq -r '.result.name' <<< "$response"
     fi
 
 }
