@@ -13,7 +13,7 @@ COPY update_dns.sh cloudflare-ddns-config.yaml dns-records.json /app/
 RUN chmod +x /app/update_dns.sh
 
 # Install required packages
-RUN apk add --no-cache curl bash yq jq tzdata python
+RUN apk add --no-cache curl bash yq jq tzdata python3 py3-pip
 
 # Install required python packages
 RUN pip install pyyaml
