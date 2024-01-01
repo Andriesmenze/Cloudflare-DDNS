@@ -210,7 +210,7 @@ main_config_keys=$(yq eval '. | to_entries | .[].key' "$CONFIG")
 ddiff=$(echo "$json_config" | jq -s 'reduce .[] as $item ({}; . * $item)')
 
 # Check if ddiff contains only keys from the main config
-if [ "$(echo "$ddiff" | jq -e --argjson main_config_keys "$main_config_keys" 'length == length + 1 and all(.key | IN($main_config_keys[]))')" = true ]; then
+if [ -n "$main_config_keys" ] && [ "$(echo "$ddiff" | jq -e --argjson main_config_keys "$main_config_keys" 'length == length + 1 and all(.key | IN($main_config_keys[]))')" = true ]; then
     log_message "[info] Configuration file is up to date, no missing or new values detected."
 else
     log_message "[error] Missing (new) values detected in the configuration file: $ddiff"
