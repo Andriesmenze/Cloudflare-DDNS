@@ -169,10 +169,23 @@ cleanup() {
 trap cleanup SIGTERM SIGINT
 
 # Check if the config file is missing (new) values
-if ! diff -q <(yq eval . "$EXAMPLE_CONFIG") <(yq eval . "$CONFIG") > /dev/null; then
-    log_message "[error] Missing (new) values detected in the configuration file."
-else
+# Function to convert YAML file to JSON format using yq
+yaml_to_json() {
+    yq eval '. as $item | input | $item * input' "$1"
+}
+
+# Convert YAML files to JSON
+json_config=$(yaml_to_json "$CONFIG")
+json_example_config=$(yaml_to_json "$EXAMPLE_CONFIG")
+
+# Compare JSON objects using jq
+ddiff=$(echo "$json_config" "$json_example_config" | jq -s 'reduce .[] as $item ({}; . * $item)')
+
+# Check if ddiff is empty
+if [ -z "$ddiff" ]; then
     log_message "[info] Configuration file is up to date, no missing or new values detected."
+else
+    log_message "[error] Missing (new) values detected in the configuration file: $ddiff"
 fi
 
 # Check if config values that are not set and set defaults
