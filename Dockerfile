@@ -12,14 +12,8 @@ COPY update_dns.sh cloudflare-ddns-config.yaml dns-records.json /app/
 # Make the script executable
 RUN chmod +x /app/update_dns.sh
 
-#Ensure Package Repositories are Up-to-date
-RUN apk update
-
 # Install required packages
-RUN apk add --no-cache curl bash yq jq tzdata python3 py3-pip
-
-# Install required python packages
-RUN pip3 install pyyaml
+RUN apk add --no-cache curl bash yq jq tzdata python3 py3-yaml
 
 # Set Timezone from ENV Variable
 ENV TZ="Europe/Amsterdam"
