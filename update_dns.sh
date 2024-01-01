@@ -190,13 +190,6 @@ cleanup() {
 # Register the cleanup function to handle termination signals
 trap cleanup SIGTERM SIGINT
 
-# Check if ddiff contains only keys from the main config
-if [ -n "$main_config_keys" ] && [ -n "$ddiff" ]; then
-    log_message "[info] Missing (new) values detected in the configuration file: $ddiff"
-else
-    log_message "[info] Configuration file is up to date, no missing or new values detected."
-fi
-
 # Check if config values that are not set and set defaults
 if [ -z "$DRY_RUN" ] || [ "$DRY_RUN" = "null" ]; then
     log_message "[info] Dry_Run option not set, defaulting to false"
