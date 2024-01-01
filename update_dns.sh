@@ -171,7 +171,7 @@ trap cleanup SIGTERM SIGINT
 # Check if the config file is missing (new) values
 # Function to convert YAML file to JSON format using yq
 yaml_to_json() {
-    yq eval '. as $item | input | $item * input' "$1"
+    yq eval '. as $item | input | ($item * input)' "$1"
 }
 
 # Convert YAML files to JSON
