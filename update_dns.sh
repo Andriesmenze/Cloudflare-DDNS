@@ -203,8 +203,8 @@ yaml_to_json() {
 # Convert YAML files to JSON
 json_config=$(yaml_to_json "$CONFIG" "$EXAMPLE_CONFIG")
 
-# Extract keys from the main configuration file
-main_config_keys=$(yq eval '. | keys | .[]' "$CONFIG")
+# Extract keys from the main configuration file using jq
+main_config_keys=$(jq -r '. | to_entries | .[].key' "$CONFIG")
 
 # Compare JSON objects using jq
 ddiff=$(echo "$json_config" | jq -s --argjson main_config_keys "$main_config_keys" '
@@ -216,7 +216,7 @@ ddiff=$(echo "$json_config" | jq -s --argjson main_config_keys "$main_config_key
 if [ -n "$main_config_keys" ] && [ -n "$ddiff" ]; then
     log_message "[info] Configuration file is up to date, no missing or new values detected."
 else
-    log_message "[error] Missing (new) values detected in the configuration file: $ddiff"
+    log_message "[info] Missing (new) values detected in the configuration file: $ddiff"
 fi
 
 # Check if config values that are not set and set defaults
