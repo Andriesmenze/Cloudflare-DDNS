@@ -192,9 +192,10 @@ trap cleanup SIGTERM SIGINT
 
 # Check if the config file is missing (new) values
 # Function to convert YAML file to JSON format using Python's yaml module
+# Function to convert YAML file to JSON format using Python's yaml module
 yaml_to_json() {
     if [ -f "$1" ] && [ -f "$2" ]; then
-        python -c "import yaml, sys, json; print(json.dumps(yaml.safe_load_all(open(sys.argv[1])), indent=2))" "$1" > "$2".json
+        python -c "import yaml, sys, json; print(json.dumps(list(yaml.safe_load_all(open(sys.argv[1]))), indent=2))" "$1" > "$2".json
     else
         log_message "[error] One or both files can not be found or loaded."
     fi
