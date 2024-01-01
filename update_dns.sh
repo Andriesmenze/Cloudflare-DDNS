@@ -204,13 +204,16 @@ yaml_to_json() {
 json_config=$(yaml_to_json "$CONFIG" "$EXAMPLE_CONFIG")
 
 # Extract keys from the main configuration file
-main_config_keys=$(yq eval '. | to_entries | .[].key' "$CONFIG")
+main_config_keys=$(yq eval '. | keys_unsorted | .[]' "$CONFIG")
 
 # Compare JSON objects using jq
-ddiff=$(echo "$json_config" | jq -s 'reduce .[] as $item ({}; . * $item)')
+ddiff=$(echo "$json_config" | jq -s --argjson main_config_keys "$main_config_keys" '
+  reduce .[] as $item ({}; . * $item)
+  | select(length == length + 1 and all(.key | IN($main_config_keys[])))
+')
 
 # Check if ddiff contains only keys from the main config
-if [ -n "$main_config_keys" ] && [ "$(echo "$ddiff" | jq -e --argjson main_config_keys "$main_config_keys" 'length == length + 1 and all(.key | IN($main_config_keys[]))')" = true ]; then
+if [ -n "$main_config_keys" ] && [ -n "$ddiff" ]; then
     log_message "[info] Configuration file is up to date, no missing or new values detected."
 else
     log_message "[error] Missing (new) values detected in the configuration file: $ddiff"
