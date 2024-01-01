@@ -200,11 +200,16 @@ yaml_to_json() {
     fi
 }
 
+# Function to extract keys in an unsorted order
+keys_unsorted() {
+    jq -r 'keys[]' "$1"
+}
+
 # Convert YAML files to JSON
 json_config=$(yaml_to_json "$CONFIG" "$EXAMPLE_CONFIG")
 
 # Extract keys from the main configuration file using jq
-main_config_keys=$(jq -r '. | keys[]' "$CONFIG")
+main_config_keys=$(jq -r 'keys_unsorted | .[]' "$CONFIG")
 
 # Compare JSON objects using jq
 ddiff=$(echo "$json_config" | jq -s --argjson main_config_keys "$main_config_keys" '
