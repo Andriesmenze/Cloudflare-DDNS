@@ -93,12 +93,20 @@ test_api_token() {
 # Function to get DNS record
 get_dns_record_value() {
     local full_record_name="${subdomain:+"$subdomain."}$record_name"
+    local record_value
+    local error
 
     response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$record_type&name=$full_record_name" \
         -H "Authorization: Bearer $API_TOKEN" \
         -H "Content-Type: application/json")
 
-    jq -r '.result[] | "\(.content) \(.id) \(.zone_name)"' <<< "$response"
+    record_value=$(jq -r '.result[] | "\(.content) \(.id) \(.zone_name)"' <<< "$response")
+    if [ -z "$record_value" ]; then
+        error=$(echo "$response" | jq -r '.errors[0].message')
+        echo "[error] $error"
+    else
+        record_value
+    fi
 }
 
 # Function to update DNS record
@@ -231,9 +239,8 @@ while true; do
 
             # Get DNS record value
             dns_record_value=$(get_dns_record_value)
-            if [ -z "$dns_record_value" ]; then
-                error_message=$(echo "$response" | jq -r '.errors[0].message')
-                log_message "[error] [Debug1] $error_message"
+            if [[ "$dns_record_value" == *"error"* ]]; then
+                log_message "$dns_record_value"
                 log_message "[error] Failed to retrieve DNS record value for record type $record_type in Zone $zone_id, skipping record update."
                 continue
             fi
