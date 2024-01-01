@@ -90,22 +90,34 @@ test_api_token() {
     fi
 }
 
+get_zone_name(){
+    local response    
+
+    response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id" \
+        -H "Authorization: Bearer $API_TOKEN" \
+        -H "Content-Type: application/json")
+
+    if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
+        echo "[error] Failed to get zone name for $zone_id: $response"
+    else
+        jq -r '.result[] | "\(.name)"' <<< "$response"
+    fi
+
+}
+
 # Function to get DNS record
 get_dns_record_value() {
     local full_record_name="${subdomain:+"$subdomain."}$record_name"
-    local record_value
-    local error
+    local response
 
     response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$record_type&name=$full_record_name" \
         -H "Authorization: Bearer $API_TOKEN" \
         -H "Content-Type: application/json")
 
-    record_value=$(jq -r '.result[] | "\(.content) \(.id) \(.zone_name)"' <<< "$response")
-    if [ -z "$record_value" ]; then
-        error=$(echo "$response" | jq -r '.errors[0].message')
-        echo "[error] $error"
+    if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
+        echo "[error] Failed to get value for DNS record $full_record_name type $record_type in zone $zone_id: $response"
     else
-        record_value
+        jq -r '.result[] | "\(.content) \(.id) \(.zone_name)"' <<< "$response"
     fi
 }
 
@@ -237,15 +249,23 @@ while true; do
             ttl=$(echo "$zone_config" | jq -r '.ttl')
             subdomain=$(echo "$zone_config" | jq -r '.subdomain')
 
+            # Get DNS zone name
+            record_name=$(get_zone_name)
+            if [[ "$record_name" == *"error"* ]]; then
+                log_message "$record_name"
+                log_message "[error] Failed to retrieve zone name for zone $zone_id, skipping record update."
+                continue
+            fi
+
             # Get DNS record value
             dns_record_value=$(get_dns_record_value)
             if [[ "$dns_record_value" == *"error"* ]]; then
                 log_message "$dns_record_value"
-                log_message "[error] Failed to retrieve DNS record value for record type $record_type in Zone $zone_id, skipping record update."
+                log_message "[error] Failed to retrieve DNS record value for record type $record_type in zone $zone_id, skipping record update."
                 continue
             fi
             IFS=" " read -r record_content record_id record_name<<< "$dns_record_value"
-            log_message "[info] Retrieved DNS record value for record ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id: $record_content"
+            log_message "[info] Retrieved DNS record value for record ${subdomain:+"$subdomain."}$record_name type $record_type in zone $zone_id: $record_content"
 
             # Check and update the record
             case "$record_type" in
