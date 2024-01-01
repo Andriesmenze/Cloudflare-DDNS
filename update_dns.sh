@@ -209,7 +209,7 @@ main_config_keys=$(yq eval '. | keys_unsorted | .[]' "$CONFIG")
 # Compare JSON objects using jq
 ddiff=$(echo "$json_config" | jq -s --argjson main_config_keys "$main_config_keys" '
   reduce .[] as $item ({}; . * $item)
-  | select(length == length + 1 and all(.key | IN($main_config_keys[])))
+  | select(length == ($main_config_keys | length) + 1 and all(.key | IN($main_config_keys[])))
 ')
 
 # Check if ddiff contains only keys from the main config
