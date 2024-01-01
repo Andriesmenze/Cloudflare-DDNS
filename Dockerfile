@@ -16,7 +16,7 @@ RUN chmod +x /app/update_dns.sh
 RUN apk add --no-cache curl bash yq jq tzdata python3 py3-pip
 
 # Install required python packages
-RUN pip install pyyaml
+RUN pip3 install pyyaml
 
 # Set Timezone from ENV Variable
 ENV TZ="Europe/Amsterdam"
