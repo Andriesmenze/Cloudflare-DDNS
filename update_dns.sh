@@ -26,9 +26,11 @@ if [ ! -f /config/dns-records.json ]; then
     cp /app/dns-records.json /config/dns-records.json
 fi
 
-# Source settings from the configuration file
+# Source the configuration files
 CONFIG="/config/cloudflare-ddns-config.yaml"
 EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
+
+# Source settings from the configuration file and/or ENV
 API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
 SLEEP_INTERVAL="${SLEEP_INT:-$(yq eval '.SLEEP_INTERVAL' "$CONFIG")}"
 LOG_FILE="${LOG_FILE_LOCATION:-$(yq eval '.LOG_FILE' "$CONFIG")}"
@@ -91,7 +93,6 @@ test_api_token() {
 # Function to get DNS record
 get_dns_record_value() {
     local full_record_name="${subdomain:+"$subdomain."}$record_name"
-    local response
 
     response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$record_type&name=$full_record_name" \
         -H "Authorization: Bearer $API_TOKEN" \
@@ -171,15 +172,18 @@ trap cleanup SIGTERM SIGINT
 # Check if the config file is missing (new) values
 # Function to convert YAML file to JSON format using yq
 yaml_to_json() {
-    yq eval 'select(fileIndex == 0) * select(fileIndex == 1)' "$1" "$2"
+    if [ -f "$1" ] && [ -f "$2" ]; then
+        yq eval 'select(fileIndex == 0) * select(fileIndex == 1)' "$1" "$2"
+    else
+        log_message "[error] One or both files can not be found or loaded."
+    fi
 }
 
 # Convert YAML files to JSON
-json_config=$(yaml_to_json "$CONFIG")
-json_example_config=$(yaml_to_json "$EXAMPLE_CONFIG")
+json_config=$(yaml_to_json "$CONFIG" "$EXAMPLE_CONFIG")
 
 # Compare JSON objects using jq
-ddiff=$(echo "$json_config" "$json_example_config" | jq -s 'reduce .[] as $item ({}; . * $item)')
+ddiff=$(echo "$json_config" | jq -s 'reduce .[] as $item ({}; . * $item)')
 
 # Check if ddiff is empty
 if [ -z "$ddiff" ]; then
@@ -226,14 +230,14 @@ while true; do
             subdomain=$(echo "$zone_config" | jq -r '.subdomain')
 
             # Get DNS record value
-            get_dns_record_value_return=$(get_dns_record_value)
-            if [ -z "$get_dns_record_value_return" ]; then
+            dns_record_value=$(get_dns_record_value)
+            if [ -z "$dns_record_value" ]; then
                 error_message=$(echo "$response" | jq -r '.errors[0].message')
                 log_message "[error] $error_message"
                 log_message "[error] Failed to retrieve DNS record value for record type $record_type in Zone $zone_id, skipping record update."
                 continue
             fi
-            IFS=" " read -r record_content record_id record_name<<< "$get_dns_record_value_return"
+            IFS=" " read -r record_content record_id record_name<<< "$dns_record_value"
             log_message "[info] Retrieved DNS record value for record ${subdomain:+"$subdomain."}$record_name type $record_type in Zone $zone_id: $record_content"
 
             # Check and update the record
