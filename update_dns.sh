@@ -90,6 +90,7 @@ test_api_token() {
     fi
 }
 
+# Function to get Zone name
 get_zone_name(){
     local response    
 
@@ -115,7 +116,7 @@ get_dns_record_value() {
         -H "Content-Type: application/json")
 
     if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
-        echo "[error] Failed to get value for DNS record $full_record_name type $record_type in zone $zone_id: $response"
+        echo "[error] Failed to get value for DNS record $full_record_name type $record_type in zone $zone_name: $response"
     else
         jq -r '.result[] | "\(.content) \(.id) "' <<< "$response"
     fi
@@ -128,7 +129,7 @@ update_dns_record() {
     local response
 
     if [ "$DRY_RUN" == "true" ]; then
-        log_message "Dry run mode: Simulating DNS record update for ${subdomain:+"$subdomain."}$zone_name type $record_type in zone $zone_id."
+        log_message "Dry run mode: Simulating DNS record update for ${subdomain:+"$subdomain."}$zone_name type $record_type in zone $zone_name."
         return  # Exit the function without making actual updates
     fi
 
@@ -145,9 +146,9 @@ update_dns_record() {
 
     # Check for errors in the response
     if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
-        echo "[error] Error updating DNS record for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_id: $response"
+        echo "[error] Error updating DNS record for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_name: $response"
     else
-        echo "[info] DNS record updated successfully for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_id."
+        echo "[info] DNS record updated successfully for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_name."
     fi
 }
 
@@ -157,26 +158,26 @@ check_and_update_record(){
     output2=""
     output3=""
     if [ "$public_ip" != "$record_content" ]; then
-        output1="[info] Current value is different from Public IP, updating DNS Record for record ${subdomain:+"$subdomain."}$zone_name type $record_type in zone $zone_id"
+        output1="[info] Current value is different from Public IP, updating DNS Record for record ${subdomain:+"$subdomain."}$zone_name type $record_type in zone $zone_name"
         # Check if proxied is not set and assign a default value of true
         if [ -z "$proxied" ] || [ "$proxied" = "null" ]; then
-            log_message "[info] proxied not set for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_id, defaulting to true."
+            log_message "[info] proxied not set for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_name, defaulting to true."
             proxied="true"
         fi
         # Check if ttl is not set and assign a default value of 1
         if [ -z "$ttl" ] || [ "$ttl" = "null" ]; then
-            log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_id, defaulting to 1(Auto)."
+            log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_name, defaulting to 1(Auto)."
             ttl="1"
         fi
         output2=$(update_dns_record "$public_ip")
         # Check for errors during DNS record update
         if [[ "$output2" == *"Error"* ]]; then
-            output3="[error] Failed to update the DNS Record for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_id."
+            output3="[error] Failed to update the DNS Record for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_name."
         else
             output3="[info] Changed the DNS Record for ${subdomain:+"$subdomain."}$zone_name type $record_type from $record_content to $public_ip"
         fi
     else
-        output1="[info] Public IP is the same as current value, skipping update for ${subdomain:+"$subdomain."}$zone_name in Zone $zone_id."
+        output1="[info] Public IP is the same as current value, skipping update for ${subdomain:+"$subdomain."}$zone_name in Zone $zone_name."
     fi
 }
 
@@ -253,25 +254,25 @@ while true; do
             zone_name=$(get_zone_name)
             if [[ "$zone_name" == *"error"* ]]; then
                 log_message "$zone_name"
-                log_message "[error] Failed to retrieve zone name for zone $zone_id, skipping record update."
+                log_message "[error] Failed to retrieve zone name for zoneid $zone_id, skipping record update."
                 continue
             else
-                log_message "[info] Retrieved zone name zone $zone_id: $zone_name"
+                log_message "[info] Retrieved zone name for zoneid $zone_id: $zone_name"
             fi
 
             # Get DNS record value
             dns_record_value=$(get_dns_record_value)
             if [[ "$dns_record_value" == *"error"* ]]; then
                 log_message "$dns_record_value"
-                log_message "[error] Failed to retrieve DNS record value for record type $record_type in zone $zone_id, skipping record update."
+                log_message "[error] Failed to retrieve DNS record value for record type $record_type in zone $zone_name, skipping record update."
                 continue
             fi
             IFS=" " read -r record_content record_id <<< "$dns_record_value"
             if [ -z "$record_content" ] || [ "$record_content" = "null" ]; then
-                log_message "[error] Failed to retrieve DNS record value for record type $record_type in zone $zone_id, skipping record update."
+                log_message "[error] Failed to retrieve DNS record value for record type $record_type in zone $zone_name, skipping record update."
                 continue
             else
-                log_message "[info] Retrieved DNS record value for record ${subdomain:+"$subdomain."}$zone_name type $record_type in zone $zone_id: $record_content"
+                log_message "[info] Retrieved DNS record value for record ${subdomain:+"$subdomain."}$zone_name type $record_type in zone $zone_name: $record_content"
             fi
             # Check and update the record
             case "$record_type" in
@@ -293,7 +294,7 @@ while true; do
                     ;;
                 *)
                     # Log if the record type is unsupported
-                    log_message "[error] Unsupported record type: $record_type, skipping update for ${subdomain:+"$subdomain."}$zone_name in Zone $zone_id."
+                    log_message "[error] Unsupported record type: $record_type, skipping update for ${subdomain:+"$subdomain."}$zone_name in Zone $zone_name."
                     continue
                     ;;
             esac
