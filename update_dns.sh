@@ -194,7 +194,7 @@ trap cleanup SIGTERM SIGINT
 # Function to convert YAML file to JSON format using yq
 yaml_to_json() {
     if [ -f "$1" ] && [ -f "$2" ]; then
-        yq eval 'select(fileIndex == 0) * select(fileIndex == 1)' "$1" "$2"
+        yq eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$1" "$2"
     else
         log_message "[error] One or both files can not be found or loaded."
     fi
