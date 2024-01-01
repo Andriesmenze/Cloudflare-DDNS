@@ -233,7 +233,7 @@ while true; do
             dns_record_value=$(get_dns_record_value)
             if [ -z "$dns_record_value" ]; then
                 error_message=$(echo "$response" | jq -r '.errors[0].message')
-                log_message "[error] $error_message"
+                log_message "[error] [Debug1] $error_message"
                 log_message "[error] Failed to retrieve DNS record value for record type $record_type in Zone $zone_id, skipping record update."
                 continue
             fi
