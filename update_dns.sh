@@ -204,7 +204,7 @@ yaml_to_json() {
 json_config=$(yaml_to_json "$CONFIG" "$EXAMPLE_CONFIG")
 
 # Extract keys from the main configuration file
-main_config_keys=$(yq eval '. | keys_unsorted | .[]' "$CONFIG")
+main_config_keys=$(yq eval '. | keys | .[]' "$CONFIG")
 
 # Compare JSON objects using jq
 ddiff=$(echo "$json_config" | jq -s --argjson main_config_keys "$main_config_keys" '
