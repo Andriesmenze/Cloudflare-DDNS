@@ -186,7 +186,7 @@ json_config=$(yaml_to_json "$CONFIG" "$EXAMPLE_CONFIG")
 ddiff=$(echo "$json_config" | jq -s 'reduce .[] as $item ({}; . * $item)')
 
 # Check if ddiff is empty
-if [ -z "$ddiff" ]; then
+if [ "$ddiff" = "{}" ]; then
     log_message "[info] Configuration file is up to date, no missing or new values detected."
 else
     log_message "[error] Missing (new) values detected in the configuration file: $ddiff"
