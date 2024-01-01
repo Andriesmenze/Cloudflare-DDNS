@@ -190,34 +190,6 @@ cleanup() {
 # Register the cleanup function to handle termination signals
 trap cleanup SIGTERM SIGINT
 
-# Check if the config file is missing (new) values
-# Function to convert YAML file to JSON format using Python's yaml module
-# Function to convert YAML file to JSON format using Python's yaml module
-yaml_to_json() {
-    if [ -f "$1" ] && [ -f "$2" ]; then
-        python -c "import yaml, sys, json; print(json.dumps(list(yaml.safe_load_all(open(sys.argv[1]))), indent=2))" "$1" > "$2".json
-    else
-        log_message "[error] One or both files can not be found or loaded."
-    fi
-}
-
-# Function to extract keys in an unsorted order
-keys_unsorted() {
-    jq -r 'to_entries | .[].key' "$1"
-}
-
-# Convert YAML files to JSON
-json_config=$(yaml_to_json "$CONFIG" "$EXAMPLE_CONFIG")
-
-# Extract keys from the main configuration file using jq and keys_unsorted function
-main_config_keys=$(keys_unsorted "$CONFIG")
-
-# Compare JSON objects using jq
-ddiff=$(echo "$json_config" | jq -s --argjson main_config_keys "$main_config_keys" '
-  reduce .[] as $item ({}; . * $item)
-  | select(length == ($main_config_keys | length) + 1 and all(.key | IN($main_config_keys[])))
-')
-
 # Check if ddiff contains only keys from the main config
 if [ -n "$main_config_keys" ] && [ -n "$ddiff" ]; then
     log_message "[info] Missing (new) values detected in the configuration file: $ddiff"
