@@ -29,8 +29,8 @@ fi
 # Source the configuration files
 CONFIG="/config/cloudflare-ddns-config.yaml"
 EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
-EXAMPLE_CONFIG_JSON=$(jq '. as $obj | to_json' $EXAMPLE_CONFIG)
-CONFIG_JSON=$(jq '. as $obj | to_json' $CONFIG)
+EXAMPLE_CONFIG_JSON=$(jq '. as $obj | to_json' EXAMPLE_CONFIG)
+CONFIG_JSON=$(jq '. as $obj | to_json' CONFIG)
 
 # Source settings from the configuration file and/or ENV
 API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
