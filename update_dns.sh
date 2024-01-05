@@ -70,13 +70,13 @@ yaml_to_json() {
     local yaml_file=$1
     local json
 
-    # Convert YAML to JSON using awk, sed, and tr
+    # Convert YAML to JSON using awk, sed, and tr (excluding comments)
     json=$(awk '
         BEGIN {
             FS=": ";
             print "{"
         }
-        {
+        !/^#/ {
             gsub(/^ +| +$/, "", $1);
             gsub(/^ +| +$/, "", $2);
 
