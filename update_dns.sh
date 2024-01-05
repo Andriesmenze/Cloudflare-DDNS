@@ -233,7 +233,7 @@ keys_example_config_json=$(echo "$example_config_json" | jq -r 'keys_unsorted | 
 keys_config_json=$(echo "$config_json" | jq -r 'keys_unsorted | .[]')
 
 # Use diff to find missing keys in config_json
-missing_keys=$(diff <(echo "$keys_example_config_json") <(echo "$keys_config_json") | grep "^< " | sed 's/^< //')
+missing_keys=$(comm -23 <(echo "$keys_example_config_json" | sort) <(echo "$keys_config_json" | sort))
 
 # Comparing the config files for missing settings
 if [ -n "$missing_keys" ]; then
