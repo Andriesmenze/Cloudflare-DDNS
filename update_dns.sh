@@ -29,8 +29,7 @@ fi
 # Source the configuration files
 CONFIG="/config/cloudflare-ddns-config.yaml"
 EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
-json_config=$(yaml_file_to_json "$CONFIG")
-json_example_config=$(yaml_file_to_json "$EXAMPLE_CONFIG")
+
 
 # Source settings from the configuration file and/or ENV
 API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
@@ -217,6 +216,9 @@ cleanup() {
 
 # Register the cleanup function to handle termination signals
 trap cleanup SIGTERM SIGINT
+
+json_config=$(yaml_file_to_json "$CONFIG")
+json_example_config=$(yaml_file_to_json "$EXAMPLE_CONFIG")
 
 # Check if there are differences
 if [ "$json_config" != "$json_example_config" ]; then
