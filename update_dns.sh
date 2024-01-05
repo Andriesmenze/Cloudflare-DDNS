@@ -191,18 +191,18 @@ cleanup() {
 trap cleanup SIGTERM SIGINT
 
 # Compare YAML files using yq and diff
-diff=$(yq eval-all ". as $item ireduce ({}; . * $item)" "$CONFIG" "$EXAMPLE_CONFIG" | jq --sort-keys)
+diff<(yq -P 'sort_keys(..)' -o=props $CONFIG) <(yq -P 'sort_keys(..)' -o=props $EXAMPLE_CONFIG comments="")
 
-echo "diff"
-echo "$diff"
+# echo "diff"
+# echo "$diff"
 
-# Check if there are differences
-if [ -n "$diff" ]; then
-    echo "Differences between $CONFIG and $EXAMPLE_CONFIG:"
-    echo "$diff"
-else
-    echo "No differences found between $CONFIG and $EXAMPLE_CONFIG."
-fi
+# # Check if there are differences
+# if [ -n "$diff" ]; then
+#     echo "Differences between $CONFIG and $EXAMPLE_CONFIG:"
+#     echo "$diff"
+# else
+#     echo "No differences found between $CONFIG and $EXAMPLE_CONFIG."
+# fi
 
 # Compare YAML files using cmp
 if cmp -s "$CONFIG" "$EXAMPLE_CONFIG"; then
