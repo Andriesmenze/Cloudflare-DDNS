@@ -193,13 +193,6 @@ trap cleanup SIGTERM SIGINT
 # Compare YAML files using yq and jq
 diff=$(yq eval-all '. as $item ireduce ({}; . * $item)' "$CONFIG" "$EXAMPLE_CONFIG" | jq --sort-keys)
 
-diff2=$(yq eval-all '. as $item ireduce ({}; . * $item)' "$CONFIG" "$EXAMPLE_CONFIG")
-
-echo "diff"
-echo "$diff"
-echo "diff2"
-echo "$diff2"
-
 # Check if there are differences
 if [ -z "$diff" ]; then
     echo "No differences found between $CONFIG and $EXAMPLE_CONFIG."
