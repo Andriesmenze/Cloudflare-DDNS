@@ -191,9 +191,9 @@ cleanup() {
 trap cleanup SIGTERM SIGINT
 
 # Compare YAML files using yq and diff
-diff<(yq -P 'sort_keys(..)' -o=props $CONFIG) <(yq -P 'sort_keys(..)' -o=props $EXAMPLE_CONFIG comments="")
+diff=<(yq -P 'sort_keys(..)' -o=props $CONFIG) <(yq -P 'sort_keys(..)' -o=props $EXAMPLE_CONFIG comments="")
 
-# echo "diff"
+echo "diff"
 # echo "$diff"
 
 # # Check if there are differences
