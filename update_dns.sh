@@ -190,6 +190,17 @@ cleanup() {
 # Register the cleanup function to handle termination signals
 trap cleanup SIGTERM SIGINT
 
+# Compare YAML files using yq and jq
+diff=$(yq eval-all 'select(fileIndex == 0) * input | select(fileIndex == 1)' "$CONFIG" "$EXAMPLE_CONFIG" | jq --sort-keys)
+
+# Check if there are differences
+if [ -z "$diff" ]; then
+    echo "No differences found between $CONFIG and $EXAMPLE_CONFIG."
+else
+    echo "Differences between $CONFIG and $EXAMPLE_CONFIG:"
+    echo "$diff"
+fi
+
 # Check if config values that are not set and set defaults
 if [ -z "$DRY_RUN" ] || [ "$DRY_RUN" = "null" ]; then
     log_message "[info] Dry_Run option not set, defaulting to false"
