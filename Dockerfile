@@ -13,10 +13,10 @@ COPY update_dns.sh cloudflare-ddns-config.yaml dns-records.json /app/
 RUN chmod +x /app/update_dns.sh
 
 # Install required packages
-RUN apk add --no-cache curl bash tzdata
+RUN apk add --no-cache curl bash yq jq tzdata
 
-# Install jq and yq packages from community repository
-RUN apk add --no-cache --repository https://dl-cdn.alpinelinux.org/alpine/edge/community jq yq
+# Install jq-to-json packages
+RUN apk add https://github.com/jtyr/jq-to-json/releases/download/v1.0.0/jq-to-json_1.0.0_x86_64.apk
 
 # Set Timezone from ENV Variable
 ENV TZ="Europe/Amsterdam"
