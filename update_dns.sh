@@ -27,8 +27,8 @@ if [ ! -f /config/dns-records.json ]; then
 fi
 
 # Source the configuration files
-CONFIG="/config/cloudflare-ddns-config.yaml"
 EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
+CONFIG="/config/cloudflare-ddns-config.yaml"
 
 # Source settings from the configuration file and/or ENV
 API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
@@ -224,15 +224,23 @@ cleanup() {
 # Register the cleanup function to handle termination signals
 trap cleanup SIGTERM SIGINT
 
-json_config=$(yaml_to_json "$CONFIG")
-json_example_config=$(yaml_to_json "$EXAMPLE_CONFIG")
+# Converting config files to json
+example_config_json=$(yaml_to_json "$EXAMPLE_CONFIG")
+config_json=$(yaml_to_json "$CONFIG")
 
-# Check if there are differences
-if [ "$json_config" != "$json_example_config" ]; then
-    echo "Differences between $CONFIG and $EXAMPLE_CONFIG (as JSON):"
-    diff <(echo "$json_config") <(echo "$json_example_config")
+# Extracting the keys from the json files
+keys_example_config_json=$(echo "$example_config_json" | jq -r 'keys_unsorted | .[]')
+keys_config_json=$(echo "$config_json" | jq -r 'keys_unsorted | .[]')
+
+# Use diff to find missing keys in config_json
+missing_keys=$(diff <(echo "$keys_example_config_json") <(echo "$keys_config_json") | grep "^< " | sed 's/^< //')
+
+# Comparing the config files for missing settings
+if [ -n "$missing_keys" ]; then
+    log_message "[info] Missing settings found in the config file."
+    log_message "[info] Missing settings: $missing_keys"
 else
-    echo "No differences found between $CONFIG and $EXAMPLE_CONFIG (as JSON)."
+    log_message "[info] No missing settings found in the config file."
 fi
 
 # Check if config values that are not set and set defaults
