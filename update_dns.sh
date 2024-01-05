@@ -191,7 +191,7 @@ cleanup() {
 trap cleanup SIGTERM SIGINT
 
 # Compare YAML files using yq and diff
-diff <(yq -P 'sort_keys(..)' -o=props file1.yaml) <(yq -P 'sort_keys(..)' -o=props file2.yaml)
+diff <(yq -P 'sort_keys(..)' -o=props $CONFIG) <(yq -P 'sort_keys(..)' -o=props $EXAMPLE_CONFIG)
 
 # # Check if there are differences
 # if [ -n "$diff" ]; then
