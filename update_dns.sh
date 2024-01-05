@@ -190,17 +190,14 @@ cleanup() {
 # Register the cleanup function to handle termination signals
 trap cleanup SIGTERM SIGINT
 
-# Compare YAML files using yq and jq
-diff=$(yq eval-all '. as $item ireduce ({}; . * $item)' "$CONFIG" "$EXAMPLE_CONFIG" | jq --sort-keys)
+# Compare YAML files using yq and diff
+diff=$(yq eval-all '.' "$CONFIG" "$EXAMPLE_CONFIG" | diff -u -)
 
 echo "diff"
 echo "$diff"
 
-echo "test"
-yq eval-all '. as $item ireduce ({}; . * $item)' "$CONFIG" "$EXAMPLE_CONFIG" | jq --sort-keys
-
 # Check if there are differences
-if [ -n "$diff" ] && [ "$(echo "$diff" | jq length 2>/dev/null)" -gt 0 ]; then
+if [ -n "$diff" ]; then
     echo "Differences between $CONFIG and $EXAMPLE_CONFIG:"
     echo "$diff"
 else
