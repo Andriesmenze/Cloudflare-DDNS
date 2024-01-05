@@ -196,9 +196,9 @@ diff=$(yq eval-all '. as $item ireduce ({}; . * $item)' "$CONFIG" "$EXAMPLE_CONF
 diff2=$(yq eval-all '. as $item ireduce ({}; . * $item)' "$CONFIG" "$EXAMPLE_CONFIG")
 
 echo "diff"
-echo $diff
+echo "$diff"
 echo "diff2"
-echo $diff2
+echo "$diff2"
 
 # Check if there are differences
 if [ -z "$diff" ]; then
