@@ -29,8 +29,8 @@ fi
 # Source the configuration files
 CONFIG="/config/cloudflare-ddns-config.yaml"
 EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
-json_config=$(yq eval-all "select(fileIndex == 0)" "$CONFIG" "$EXAMPLE_CONFIG" | jq --sort-keys)
-json_example_config=$(yq eval-all "select(fileIndex == 1)" "$CONFIG" "$EXAMPLE_CONFIG" | jq --sort-keys)
+json_config=$(yaml_file_to_json "$CONFIG")
+json_example_config=$(yaml_file_to_json "$EXAMPLE_CONFIG")
 
 # Source settings from the configuration file and/or ENV
 API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
@@ -43,6 +43,32 @@ DNS_RECORDS_JSON=$(cat /config/dns-records.json)
 
 # Convert JSON array to Bash array
 IFS=$'\n' read -d '' -ra ZONE_CONFIGS < <(echo "$DNS_RECORDS_JSON" | jq -c '.ZONE_CONFIGS[]')
+
+yaml_file_to_json() {
+    local yaml_file="$1"
+    
+    # Check if the yaml2json command is available
+    if command -v yaml2json > /dev/null; then
+        # Check if the file exists
+        if [ -f "$yaml_file" ]; then
+            # Use yaml2json to convert YAML to JSON
+            yaml2json < "$yaml_file"
+        else
+            echo "Error: File not found: $yaml_file" >&2
+            return 1
+        fi
+    else
+        echo "Error: yaml2json not found. Please install jq package." >&2
+        return 1
+    fi
+}
+
+# Example usage:
+yaml_content="example_key: example_value"
+json_result=$(yaml_to_json "$yaml_content")
+
+# Print the resulting JSON
+echo "$json_result"
 
 # Function to log messages and echo to the console
 log_message() {
@@ -201,7 +227,7 @@ else
 fi
 
 echo "debugging"
-echo "$json_config"
+echo "$json_example_config"
 
 
 # Check if config values that are not set and set defaults
