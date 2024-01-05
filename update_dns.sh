@@ -237,8 +237,9 @@ missing_keys=$(comm -23 <(echo "$keys_example_config_json" | sort) <(echo "$keys
 
 # Comparing the config files for missing settings
 if [ -n "$missing_keys" ]; then
+    formatted_missing_keys=$(echo "$missing_keys" | tr '\n' ', ')
     log_message "[info] Missing settings found in the config file."
-    log_message "[info] Missing settings: $missing_keys"
+    log_message "[info] Missing settings: $formatted_missing_keys"
 else
     log_message "[info] No missing settings found in the config file."
 fi
