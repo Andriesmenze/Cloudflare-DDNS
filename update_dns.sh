@@ -29,6 +29,8 @@ fi
 # Source the configuration files
 CONFIG="/config/cloudflare-ddns-config.yaml"
 EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
+EXAMPLE_CONFIG_JSON=$(jq '. as $obj | to_json' $EXAMPLE_CONFIG)
+CONFIG_JSON=$(jq '. as $obj | to_json' $CONFIG)
 
 # Source settings from the configuration file and/or ENV
 API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
@@ -190,24 +192,10 @@ cleanup() {
 # Register the cleanup function to handle termination signals
 trap cleanup SIGTERM SIGINT
 
-# Compare YAML files using yq and diff
-diff <(yq -P 'sort_keys(..)' -o=props $CONFIG) <(yq -P 'sort_keys(..)' -o=props $EXAMPLE_CONFIG comments="")
+diff=$(yq eval --diff ". != $CONFIG_JSON" EXAMPLE_CONFIG_JSON)
+missing_values=$(echo "$diff" | yq r ".[] | select(. == ..'CONFIG_JSON').key")
+echo "$missing_values"
 
-# # Check if there are differences
-# if [ -n "$diff" ]; then
-#     echo "Differences between $CONFIG and $EXAMPLE_CONFIG:"
-#     echo "$diff"
-# else
-#     echo "No differences found between $CONFIG and $EXAMPLE_CONFIG."
-# fi
-
-# # Compare YAML files using cmp
-# if cmp -s "$CONFIG" "$EXAMPLE_CONFIG"; then
-#     echo "No differences found between $CONFIG and $EXAMPLE_CONFIG."
-# else
-#     echo "Differences between $CONFIG and $EXAMPLE_CONFIG:"
-#     cmp "$CONFIG" "$EXAMPLE_CONFIG"
-# fi
 
 # Check if config values that are not set and set defaults
 if [ -z "$DRY_RUN" ] || [ "$DRY_RUN" = "null" ]; then
