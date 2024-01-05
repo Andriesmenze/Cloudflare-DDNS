@@ -235,10 +235,6 @@ else
     echo "No differences found between $CONFIG and $EXAMPLE_CONFIG (as JSON)."
 fi
 
-echo "debugging"
-echo "$json_config"
-
-
 # Check if config values that are not set and set defaults
 if [ -z "$DRY_RUN" ] || [ "$DRY_RUN" = "null" ]; then
     log_message "[info] Dry_Run option not set, defaulting to false"
