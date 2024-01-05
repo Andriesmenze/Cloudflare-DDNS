@@ -68,6 +68,34 @@ log_message() {
     fi
 }
 
+yaml_to_json() {
+    local yaml_file=$1
+    local json
+
+    # Convert YAML to JSON using awk, sed, and tr
+    json=$(awk '
+        BEGIN {
+            FS=": ";
+            print "{"
+        }
+        {
+            gsub(/^ +| +$/, "", $1);
+            gsub(/^ +| +$/, "", $2);
+
+            if ($2 == "") {
+                printf("\"%s\": {", $1);
+            } else {
+                printf("\"%s\": \"%s\",", $1, $2);
+            }
+        }
+        END {
+            print "}"
+        }
+    ' "$yaml_file" | sed 's/,$//' | tr -d '\n')
+
+    echo "$json"
+}
+
 # Function to get the current public IPv4 address
 get_public_ipv4() {
     curl -s https://api.ipify.org?format=text
