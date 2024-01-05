@@ -88,12 +88,9 @@ yaml_to_json() {
             }
         }
         END {
-            if (NR > 0) {
-                sub(/,$/, "");
-            }
-            print "\n}"
+            print "}"
         }
-    ' "$yaml_file" | tr -d '\n')
+    ' "$yaml_file" | sed 's/,$//' | tr -d '\n')
 
     echo "$json"
 }
