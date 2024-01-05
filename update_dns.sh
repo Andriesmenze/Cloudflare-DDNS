@@ -29,8 +29,8 @@ fi
 # Source the configuration files
 CONFIG="/config/cloudflare-ddns-config.yaml"
 EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
-json_config=$(yq eval-all 'select(fileIndex == 0)' "$CONFIG" "$EXAMPLE_CONFIG" | jq --sort-keys)
-json_example_config=$(yq eval-all 'select(fileIndex == 1)' "$CONFIG" "$EXAMPLE_CONFIG" | jq --sort-keys)
+json_config=$(yq eval-all "select(fileIndex == 0)" "$CONFIG" "$EXAMPLE_CONFIG" | jq --sort-keys)
+json_example_config=$(yq eval-all "select(fileIndex == 1)" "$CONFIG" "$EXAMPLE_CONFIG" | jq --sort-keys)
 
 # Source settings from the configuration file and/or ENV
 API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
@@ -199,6 +199,9 @@ if [ "$json_config" != "$json_example_config" ]; then
 else
     echo "No differences found between $CONFIG and $EXAMPLE_CONFIG (as JSON)."
 fi
+
+echo "debugging"
+echo "$json_config"
 
 
 # Check if config values that are not set and set defaults
