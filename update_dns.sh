@@ -191,9 +191,9 @@ cleanup() {
 trap cleanup SIGTERM SIGINT
 
 # Compare YAML files using yq and diff
-diff=<(yq -P 'sort_keys(..)' -o=props $CONFIG) <(yq -P 'sort_keys(..)' -o=props $EXAMPLE_CONFIG comments="")
+diff <(yq -P 'sort_keys(..)' -o=props $CONFIG) <(yq -P 'sort_keys(..)' -o=props $EXAMPLE_CONFIG comments="")
 
-echo "diff"
+# echo "diff"
 # echo "$diff"
 
 # # Check if there are differences
@@ -204,13 +204,13 @@ echo "diff"
 #     echo "No differences found between $CONFIG and $EXAMPLE_CONFIG."
 # fi
 
-# Compare YAML files using cmp
-if cmp -s "$CONFIG" "$EXAMPLE_CONFIG"; then
-    echo "No differences found between $CONFIG and $EXAMPLE_CONFIG."
-else
-    echo "Differences between $CONFIG and $EXAMPLE_CONFIG:"
-    cmp "$CONFIG" "$EXAMPLE_CONFIG"
-fi
+# # Compare YAML files using cmp
+# if cmp -s "$CONFIG" "$EXAMPLE_CONFIG"; then
+#     echo "No differences found between $CONFIG and $EXAMPLE_CONFIG."
+# else
+#     echo "Differences between $CONFIG and $EXAMPLE_CONFIG:"
+#     cmp "$CONFIG" "$EXAMPLE_CONFIG"
+# fi
 
 # Check if config values that are not set and set defaults
 if [ -z "$DRY_RUN" ] || [ "$DRY_RUN" = "null" ]; then
