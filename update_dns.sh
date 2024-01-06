@@ -1,23 +1,5 @@
 #!/bin/bash
 
-# Check if curl is installed
-if ! command -v curl &> /dev/null; then
-    echo "[error] curl is not installed. Please install curl (e.g., 'apk --no-cache add curl' or 'apt-get install curl')." >&2
-    exit 1
-fi
-
-# Check if yq is installed
-if ! command -v yq &> /dev/null; then
-    echo "[error] yq is not installed. Please install yq (e.g., 'apk --no-cache add yq' or 'apt-get install yq')." >&2
-    exit 1
-fi
-
-# Check if jq is installed
-if ! command -v jq &> /dev/null; then
-    echo "[error] jq is not installed. Please install jq (e.g., 'apk --no-cache add jq' or 'apt-get install jq')." >&2
-    exit 1
-fi
-
 # Create config files if they don't exist
 if [ ! -f /config/cloudflare-ddns-config.yaml ]; then
     cp /app/cloudflare-ddns-config.yaml /config/cloudflare-ddns-config.yaml
@@ -65,6 +47,30 @@ log_message() {
         echo "[info] Log file rotated. Old log file: $backup_file" >> "$LOG_FILE" 2>&1
     fi
 }
+
+# Check if curl is installed
+if ! command -v curl &> /dev/null; then
+    log_message "[error] curl is not installed." >&2
+    exit 1
+fi
+
+# Check if yq is installed
+if ! command -v yq &> /dev/null; then
+    log_message "[error] yq is not installed." >&2
+    exit 1
+fi
+
+# Check if jq is installed
+if ! command -v jq &> /dev/null; then
+    log_message "[error] jq is not installed." >&2
+    exit 1
+fi
+
+# Check if awk is installed
+if ! command -v awk &> /dev/null; then
+    log_message "[error] awk is not installed." >&2
+    exit 1
+fi
 
 # Convert YAML to JSON using awk, tr, and sed
 yaml_to_json() {
