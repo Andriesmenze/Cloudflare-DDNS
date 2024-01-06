@@ -66,11 +66,11 @@ log_message() {
     fi
 }
 
+# Convert YAML to JSON using awk, tr, and sed
 yaml_to_json() {
     local yaml_file=$1
     local json
 
-    # Convert YAML to JSON using awk, sed, and tr (excluding comments)
     json=$(awk '
         BEGIN {
             FS=": ";
