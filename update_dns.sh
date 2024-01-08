@@ -168,7 +168,7 @@ update_dns_record() {
     local full_record_name="${subdomain:+"$subdomain."}$zone_name"
     local response
 
-    if [ "$DRY_RUN" == "true" ]; then
+    if [[ "${DRY_RUN,,}" == "true" ]]; then
         log_message "Dry run mode: Simulating DNS record update for ${subdomain:+"$subdomain."}$zone_name type $record_type in zone $zone_name."
         return  # Exit the function without making actual updates
     fi
