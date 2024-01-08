@@ -244,23 +244,32 @@ missing_keys=$(comm -23 <(echo "$keys_example_config_json" | sort) <(echo "$keys
 # Comparing the config files for missing settings
 if [ -n "$missing_keys" ]; then
     formatted_missing_keys=$(echo "$missing_keys" | tr '\n' ',' | sed 's/,$//;s/,/, /g')
-    log_message "[info] Missing settings found in the config file."
-    log_message "[info] Missing settings: $formatted_missing_keys"
+    log_message "[warning] Missing settings found in the config file."
+    log_message "[warning] Missing settings: $formatted_missing_keys"
 else
     log_message "[info] No missing settings found in the config file."
 fi
 
-# Check if config values that are not set and set defaults
+# Check if config values  not specified/invalid and set defaults
 if [ -z "$DRY_RUN" ] || [ "$DRY_RUN" = "null" ]; then
     log_message "[info] Dry run option not specified, defaulting to false"
+    DRY_RUN="false"
+elif [[ ! "$DRY_RUN" =~ ^[Tt]rue$|^[Ff]alse$ ]]; then
+    log_message "[warning] Invalid value for DRY_RUN. defaulting to false."
     DRY_RUN="false"
 fi
 if [ -z "$SLEEP_INTERVAL" ] || [ "$SLEEP_INTERVAL" = "null" ]; then
     log_message "[info] Sleep interval not specified, defaulting to 900 seconds"
     SLEEP_INTERVAL="900"
+elif ! [[ "$SLEEP_INTERVAL" =~ ^[0-9]+$ ]]; then
+    log_message "[warning] Invalid value for SLEEP_INTERVAL. defaulting to 900."
+    SLEEP_INTERVAL="900"
 fi
 if [ -z "$LOG_FILE" ] || [ "$LOG_FILE" = "null" ]; then
     log_message "[info] Log file location not specified, defaulting to /var/log/cloudflare-ddns/update_dns.log"
+    LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
+elif [ ! -d "$(dirname "$LOG_FILE")" ]; then
+    log_message "[warning] Invalid path for LOG_FILE. defaulting to /var/log/cloudflare-ddns/update_dns.log."
     LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
 fi
 
