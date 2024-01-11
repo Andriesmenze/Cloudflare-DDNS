@@ -1,29 +1,5 @@
 #!/bin/bash
 
-# Create config files if they don't exist
-if [ ! -f /config/cloudflare-ddns-config.yaml ]; then
-    cp /app/cloudflare-ddns-config.yaml /config/cloudflare-ddns-config.yaml
-fi
-if [ ! -f /config/dns-records.json ]; then
-    cp /app/dns-records.json /config/dns-records.json
-fi
-
-# Source the configuration files
-EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
-CONFIG="/config/cloudflare-ddns-config.yaml"
-
-# Source settings from the configuration file and/or ENV
-API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
-SLEEP_INTERVAL="${SLEEP_INT:-$(yq eval '.SLEEP_INTERVAL' "$CONFIG")}"
-LOG_FILE="${LOG_FILE_LOCATION:-$(yq eval '.LOG_FILE' "$CONFIG")}"
-DRY_RUN="${DRY_RUN_MODE:-$(yq eval '.DRY_RUN' "$CONFIG")}"
-
-# Load the JSON file into a variable
-DNS_RECORDS_JSON=$(cat /config/dns-records.json)
-
-# Convert JSON array to Bash array
-IFS=$'\n' read -d '' -ra RECORDS_CONFIG < <(echo "$DNS_RECORDS_JSON" | jq -c '.RECORDS_CONFIG[]')
-
 # Function to log messages and echo to the console
 log_message() {
     local timestamp
@@ -230,6 +206,42 @@ cleanup() {
 
 # Register the cleanup function to handle termination signals
 trap cleanup SIGTERM SIGINT
+
+# Create config files if they don't exist
+if [ ! -f /config/cloudflare-ddns-config.yaml ]; then
+    cp /app/cloudflare-ddns-config.yaml /config/cloudflare-ddns-config.yaml
+fi
+if [ ! -f /config/dns-records.json ]; then
+    cp /app/dns-records.json /config/dns-records.json
+fi
+
+# Source the configuration files
+EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
+CONFIG="/config/cloudflare-ddns-config.yaml"
+
+# Source settings from the configuration file and/or ENV
+API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
+SLEEP_INTERVAL="${SLEEP_INT:-$(yq eval '.SLEEP_INTERVAL' "$CONFIG")}"
+LOG_FILE="${LOG_FILE_LOCATION:-$(yq eval '.LOG_FILE' "$CONFIG")}"
+DRY_RUN="${DRY_RUN_MODE:-$(yq eval '.DRY_RUN' "$CONFIG")}"
+
+# Load the JSON file into a variable
+DNS_RECORDS_JSON=$(cat /config/dns-records.json)
+
+# Check if RECORDS_CONFIG key exists in JSON
+if jq -e '.RECORDS_CONFIG' <<< "$DNS_RECORDS_JSON" >/dev/null; then
+    # Convert JSON array to Bash array
+    IFS=$'\n' read -d '' -ra RECORDS_CONFIG < <(echo "$DNS_RECORDS_JSON" | jq -c '.RECORDS_CONFIG[]')
+    
+    # Check if the array is not empty
+    if [ ${#RECORDS_CONFIG[@]} -eq 0 ]; then
+        log_message "[error] No records found in the RECORDS_CONFIG array in dns-records.json."
+        exit
+    fi
+else
+    log_message "[error] RECORDS_CONFIG key not found in dns-records.json."
+    exit
+fi
 
 # Converting config files to json
 example_config_json=$(yaml_to_json "$EXAMPLE_CONFIG")
