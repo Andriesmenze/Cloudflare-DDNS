@@ -22,7 +22,7 @@ DRY_RUN="${DRY_RUN_MODE:-$(yq eval '.DRY_RUN' "$CONFIG")}"
 DNS_RECORDS_JSON=$(cat /config/dns-records.json)
 
 # Convert JSON array to Bash array
-IFS=$'\n' read -d '' -ra ZONE_CONFIGS < <(echo "$DNS_RECORDS_JSON" | jq -c '.ZONE_CONFIGS[]')
+IFS=$'\n' read -d '' -ra RECORDS_CONFIG < <(echo "$DNS_RECORDS_JSON" | jq -c '.RECORDS_CONFIG[]')
 
 # Function to log messages and echo to the console
 log_message() {
@@ -119,8 +119,9 @@ get_public_ipv6() {
 # Function to test Cloudflare API token
 test_api_token() {
     local response
+    local TOKEN=$1
     response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/user/tokens/verify" \
-        -H "Authorization: Bearer $API_TOKEN")
+        -H "Authorization: Bearer $TOKEN")
 
     # Check for errors in the response
     if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
@@ -211,7 +212,7 @@ check_and_update_record(){
         fi
         output2=$(update_dns_record "$public_ip")
         # Check for errors during DNS record update
-        if [[ "$output2" == *"Error"* ]]; then
+        if [[ "$output2" == *"error"* ]]; then
             output3="[error] Failed to update the DNS Record for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_name."
         else
             output3="[info] Changed the DNS Record for ${subdomain:+"$subdomain."}$zone_name type $record_type from $record_content to $public_ip"
@@ -278,9 +279,9 @@ log_message "[info] Script has initialised"
 while true; do
 
     # Test the cloudflare API Token
-    token_status=$(test_api_token)
+    token_status=$(test_api_token "$API_TOKEN")
     log_message "$token_status"
-    if [[ "$token_status" != *"Error"* && -n "$API_TOKEN" && "$API_TOKEN" != "YOUR_CLOUDFLARE_API_TOKEN" ]]; then
+    if [[ "$token_status" != *"error"* && -n "$API_TOKEN" && "$API_TOKEN" != "YOUR_CLOUDFLARE_API_TOKEN" ]]; then
 
         # Retrieve the current public IPv4 and IPv6 addresses
         current_ipv4=$(get_public_ipv4)
@@ -289,12 +290,27 @@ while true; do
         log_message "[info] Current public IPV6 address is $current_ipv6"
 
         # Iterate through each configured DNS record
-        for zone_config in "${ZONE_CONFIGS[@]}"; do
-            zone_id=$(echo "$zone_config" | jq -r '.zone_id')
-            record_type=$(echo "$zone_config" | jq -r '.record_type')
-            proxied=$(echo "$zone_config" | jq -r '.proxied')
-            ttl=$(echo "$zone_config" | jq -r '.ttl')
-            subdomain=$(echo "$zone_config" | jq -r '.subdomain')
+        for record in "${RECORDS_CONFIG[@]}"; do
+            zone_id=$(echo "$record" | jq -r '.zone_id')
+            record_type=$(echo "$record" | jq -r '.record_type')
+            proxied=$(echo "$record" | jq -r '.proxied')
+            ttl=$(echo "$record" | jq -r '.ttl')
+            subdomain=$(echo "$record" | jq -r '.subdomain')
+            alternate_api_token=$(echo "$record" | jq -r '.alternate_api_token')
+
+            if [[ -z "$alternate_api_token" || "$alternate_api_token" = "null" || "$alternate_api_token" == "ALTERNATE_CLOUDFLARE_API_TOKEN" ]]; then
+                log_message "[info] No alternate API token speciefd using token from config or env variable."
+            else
+                record_token_status=$(test_api_token "$alternate_api_token")
+                log_message "$record_token_status"
+                if [[ "$record_token_status" != *"error"* ]]; then
+                    global_token=$API_TOKEN
+                    API_TOKEN=$alternate_api_token
+                    using_alt_token="true"
+                else
+                    log_message "[error] Alternate api token invalid, trying global token from config or env variable."
+                fi
+            fi
 
             # Get DNS zone name
             zone_name=$(get_zone_name)
@@ -344,6 +360,10 @@ while true; do
                     continue
                     ;;
             esac
+            if [[ "$using_alt_token" == *"true"* ]]; then
+                API_TOKEN=$global_token
+                using_alt_token="false"
+            fi
         done
     fi
     # Sleep for the specified interval before the next run

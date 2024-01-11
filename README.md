@@ -88,35 +88,41 @@ If you're configuring a record for the root domain, you can leave this field emp
 
 **proxied**  
 Whether the record is being proxied through Cloudflare to receive the performance and security benefits of Cloudflare.  
-Can be true or false, When not specified it defaults to true.  
+Can be true or false, when not specified it defaults to true.  
 
 **ttl**  
-Time To Live (TTL) of the DNS record in seconds, When not specified it defaults to 1.  
+Time To Live (TTL) of the DNS record in seconds, when not specified it defaults to 1.  
 Setting to 1 means 'automatic'. The value must be between 60 and 86400, with the minimum reduced to 30 for Enterprise zones.  
+
+**alternate_api_token**  
+Alternate api token for the DNS record, when not specified the API Token from the cloudflare-ddns-config.yaml or ENV variable is used.  
 
 ```json
 {
-  "ZONE_CONFIGS": [
+  "RECORDS_CONFIG": [
     {
       "zone_id": "ZONE_ID_1",
       "record_type": "A",
       "subdomain": "",
       "proxied": "true",
-      "ttl": "1"
+      "ttl": "1",
+      "alternate_api_token": "ALTERNATE_CLOUDFLARE_API_TOKEN"
     },
     {
       "zone_id": "ZONE_ID_2",
       "record_type": "AAAA",
       "subdomain": "",
       "proxied": "false",
-      "ttl": "1"
+      "ttl": "1",
+      "alternate_api_token": "ALTERNATE_CLOUDFLARE_API_TOKEN"
     },
     {
       "zone_id": "ZONE_ID_2",
       "record_type": "AAAA",
       "subdomain": "www",
       "proxied": "true",
-      "ttl": "1"
+      "ttl": "1",
+      "alternate_api_token": "ALTERNATE_CLOUDFLARE_API_TOKEN"
     }
   ]
 }
