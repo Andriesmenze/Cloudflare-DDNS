@@ -236,11 +236,11 @@ if jq -e '.RECORDS_CONFIG' <<< "$DNS_RECORDS_JSON" >/dev/null; then
     # Check if the array is not empty
     if [ ${#RECORDS_CONFIG[@]} -eq 0 ]; then
         log_message "[error] No records found in the RECORDS_CONFIG array in dns-records.json, exiting."
-        exit
+        exit 1
     fi
 else
     log_message "[error] RECORDS_CONFIG key not found in dns-records.json, exiting."
-    exit
+    exit 1
 fi
 
 # Converting config files to json
@@ -379,7 +379,7 @@ while true; do
         done
     else
         log_message "[error] Cloudflare API token not valid, exiting."
-        exit
+        exit 1
     fi
     # Sleep for the specified interval before the next run
     log_message "[info] End of the run, sleeping for $SLEEP_INTERVAL seconds."
