@@ -82,14 +82,22 @@ yaml_to_json() {
     echo "$json"
 }
 
-# Function to get the current public IPv4 address
-get_public_ipv4() {
-    curl -s https://api.ipify.org?format=text
-}
+# Function to get the current public IP address
+get_public_ip() {
+    local version=$1
 
-# Function to get the current public IPv6 address
-get_public_ipv6() {
-    curl -s https://api64.ipify.org?format=text
+    case "$version" in
+        "v4")
+            curl -s https://api.ipify.org?format=text
+            ;;
+        "v6")
+            curl -s https://api64.ipify.org?format=text
+            ;;
+        *)
+            # Log invalid ip version
+            log_message "[error] Invalid ip version."
+            ;;
+    esac
 }
 
 # Function to test Cloudflare API token
@@ -108,7 +116,7 @@ test_api_token() {
 }
 
 # Function to get Zone name
-get_zone_name(){
+get_zone_name() {
     local response    
 
     response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id" \
@@ -120,7 +128,6 @@ get_zone_name(){
     else
         jq -r '.result.name' <<< "$response"
     fi
-
 }
 
 # Function to get DNS record
@@ -169,7 +176,7 @@ update_dns_record() {
     fi
 }
 
-check_and_update_record(){
+check_and_update_record() {
     # Check if the public IPv4 is different from the current DNS record value
     local public_ip=$1
     output2=""
@@ -296,9 +303,9 @@ while true; do
     if [[ "$token_status" != *"error"* && -n "$API_TOKEN" && "$API_TOKEN" != "YOUR_CLOUDFLARE_API_TOKEN" ]]; then
 
         # Retrieve the current public IPv4 and IPv6 addresses
-        current_ipv4=$(get_public_ipv4)
+        current_ipv4=$(get_public_ip "v4")
         log_message "[info] Current public IPV4 address is $current_ipv4"
-        current_ipv6=$(get_public_ipv6)
+        current_ipv6=$(get_public_ip "v6")
         log_message "[info] Current public IPV6 address is $current_ipv6"
 
         # Iterate through each configured DNS record
