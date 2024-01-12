@@ -317,6 +317,14 @@ elif [ ! -d "$(dirname "$LOG_FILE")" ]; then
     LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
 fi
 
+local_ipv6_address=$(ip -6 addr show scope global | grep inet6 | awk '{print $2}' | cut -d'/' -f1)
+if [ -z "$local_ipv6_address" ]; then
+    log_message "[warning] Container does not have an IPv6 address."
+    ipv6="false"
+else
+    ipv6="true"
+fi
+
 log_message "[info] Script has initialised"
 # Main loop
 while true; do
@@ -329,8 +337,10 @@ while true; do
         # Retrieve the current public IPv4 and IPv6 addresses
         current_ipv4=$(get_public_ip "v4")
         log_message "[info] Current public IPV4 address is $current_ipv4"
-        current_ipv6=$(get_public_ip "v6")
-        log_message "[info] Current public IPV6 address is $current_ipv6"
+        if [[ "$ipv6" == *"true"* ]]; then
+            current_ipv6=$(get_public_ip "v6")
+            log_message "[info] Current public IPV6 address is $current_ipv6"
+        fi
 
         # Iterate through each configured DNS record
         for record in "${RECORDS_CONFIG[@]}"; do
@@ -390,12 +400,16 @@ while true; do
                     done
                     ;;
                 "AAAA")
-                    check_and_update_record "$current_ipv6"
-                    for output in "$output1" "$output2" "$output3"; do
-                        if [ -n "$output" ]; then
-                            log_message "$output"
-                        fi
-                    done
+                    if [[ "$ipv6" == *"true"* ]]; then
+                        check_and_update_record "$current_ipv6"
+                        for output in "$output1" "$output2" "$output3"; do
+                            if [ -n "$output" ]; then
+                                log_message "$output"
+                            fi
+                        done
+                    else
+                        log_message "[warning] Container does not have an IPv6 address, skipping record."
+                    fi
                     ;;
                 *)
                     # Log if the record type is unsupported
