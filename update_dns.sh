@@ -114,7 +114,7 @@ get_public_ip() {
         fi
     elif [ -n "$ip_cloudflare" ]; then
         # Use IP address from Cloudflare when api.ipify.org's response is empty
-        echo "$ip_cloudflare"
+        echo "$ip_cloudflare".
     elif [ -n "$ip_ipify" ]; then
         # Use IP address from api.ipify.org when Cloudflare's response is empty
         echo "$ip_ipify"
@@ -319,7 +319,7 @@ fi
 
 local_ipv6_address=$(ip -6 addr show scope global | grep inet6 | awk '{print $2}' | cut -d'/' -f1)
 if [ -z "$local_ipv6_address" ]; then
-    log_message "[warning] Container does not have an IPv6 address."
+    log_message "[warning] Container does not have an IPv6 address, make sure the host has IPv6 enabled and the container is on the host network."
     ipv6="false"
 else
     ipv6="true"

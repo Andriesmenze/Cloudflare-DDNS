@@ -12,6 +12,9 @@ It's particularly useful for maintaining DNS records for services hosted at home
 - **Flexible Configuration**: Easy-to-configure YAML file for the main config and JSON for specifying DNS records.
 - **Logging and Debugging**: Detailed logging for troubleshooting and debugging.
 
+> [!NOTE]
+> For IPv6, the container needs to be on the host network, and records get updated to the public IPv6 address of the container host.  
+
 ## Setup
 
 **For linux/amd64 and linux/arm64:**
