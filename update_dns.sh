@@ -85,19 +85,43 @@ yaml_to_json() {
 # Function to get the current public IP address
 get_public_ip() {
     local version=$1
+    local ip_ipify
+    local ip_cloudflare
 
     case "$version" in
         "v4")
-            curl -s https://api.ipify.org?format=text
+            ip_ipify=$(curl -s https://api.ipify.org?format=text)
+            ip_cloudflare=$(curl -s https://1.1.1.1/cdn-cgi/trace | grep "ip=" | cut -d'=' -f2)
             ;;
         "v6")
-            curl -s https://api64.ipify.org?format=text
+            ip_ipify=$(curl -s https://api64.ipify.org?format=text)
+            ip_cloudflare=$(curl -s 'https://[2606:4700:4700::1111]/cdn-cgi/trace' | grep "ip=" | cut -d'=' -f2)
             ;;
         *)
             # Log invalid ip version
             log_message "[error] Invalid ip version."
             ;;
     esac
+
+    # Check if both responses are not empty
+    if [ -n "$ip_ipify" ] && [ -n "$ip_cloudflare" ]; then
+        # Check if the IP addresses are the same
+        if [ "$ip_ipify" = "$ip_cloudflare" ]; then
+            echo "$ip_cloudflare"
+        else
+            # Log and use Cloudflare's IP address when they are different
+            echo "$ip_cloudflare"
+        fi
+    elif [ -n "$ip_cloudflare" ]; then
+        # Use IP address from Cloudflare when api.ipify.org's response is empty
+        echo "$ip_cloudflare"
+    elif [ -n "$ip_ipify" ]; then
+        # Use IP address from api.ipify.org when Cloudflare's response is empty
+        echo "$ip_ipify"
+    else
+        # Log and return error when both responses are empty
+        log_message "[error] Unable to retrieve public IP address."
+    fi
 }
 
 # Function to test Cloudflare API token
