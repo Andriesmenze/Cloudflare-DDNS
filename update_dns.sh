@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Source the configuration files
+EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
+CONFIG="/config/cloudflare-ddns-config.yaml"
+
 # Set Log file location and rotation settings
 LOG_FILE="${LOG_FILE_LOCATION:-$(yq eval '.LOG_FILE' "$CONFIG")}"
 LOG_ROTATION="${ENABLE_LOG_ROTATION:-$(yq eval '.LOG_ROTATION' "$CONFIG")}"
@@ -320,10 +324,6 @@ fi
 if [ ! -f /config/dns-records.json ]; then
     cp /app/dns-records.json /config/dns-records.json
 fi
-
-# Source the configuration files
-EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
-CONFIG="/config/cloudflare-ddns-config.yaml"
 
 # Source settings from the configuration file and/or ENV
 API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
