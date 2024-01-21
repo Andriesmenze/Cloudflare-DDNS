@@ -313,7 +313,11 @@ fi
 
 local_ipv6_address=$(ip -6 addr show scope global | grep inet6 | awk '{print $2}' | cut -d'/' -f1)
 if [ -z "$local_ipv6_address" ]; then
-    log_message "[warning] Container does not have an IPv6 address, make sure the host has IPv6 enabled and the container is on the host network."
+    if grep -q '"record_type": "AAAA"' dns-records.json; then
+        log_message "[error] Container does not have an IPv6 address, make sure the host has IPv6 enabled and the container is on the host network."
+    else
+        log_message "[info] Container does not have an IPv6 address."
+    fi
     ipv6="false"
 else
     ipv6="true"
