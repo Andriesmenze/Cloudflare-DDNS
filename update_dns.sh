@@ -1,10 +1,75 @@
 #!/bin/bash
 
+# Set Log file location and rotation settings
+LOG_FILE="${LOG_FILE_LOCATION:-$(yq eval '.LOG_FILE' "$CONFIG")}"
+LOG_ROTATION="${ENABLE_LOG_ROTATION:-$(yq eval '.LOG_ROTATION' "$CONFIG")}"
+LOG_ROTATION_SIZE="${MAX_LOG_SIZE:-$(yq eval '.LOG_ROTATION_SIZE' "$CONFIG")}"
+REMOVE_OLD_LOGS="${DELETE_OLD_LOGS:-$(yq eval '.REMOVE_OLD_LOGS' "$CONFIG")}"
+LOG_FILES_AMOUNT="${NUMBER_OF_LOG_FILES_TO_KEEP:-$(yq eval '.LOG_FILES_AMOUNT' "$CONFIG")}"
+
+# Check if LOG_FILE is not specified/invalid and set default
+if [ -z "$LOG_FILE" ] || [ "$LOG_FILE" = "null" ]; then
+    echo "[info] Log file location not specified, defaulting to /var/log/cloudflare-ddns/update_dns.log"
+    LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
+elif [ ! -d "$(dirname "$LOG_FILE")" ]; then
+    echo "[warning] Invalid path for LOG_FILE. defaulting to /var/log/cloudflare-ddns/update_dns.log."
+    LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
+fi
+
+# Function to log startup messages before log_message is defined
+startup_log() {
+    local timestamp
+    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    local log_entry="[$timestamp] $1"
+    
+    # Print log entry to console
+    echo "$log_entry"
+    
+    # Log to file
+    echo "$log_entry" >> "$LOG_FILE" 2>&1
+}
+
+# Check if log config values not specified/invalid and set defaults
+if [ -z "$LOG_ROTATION" ] || [ "$LOG_ROTATION" = "null" ]; then
+    startup_log "[info] LOG_ROTATION option not specified, defaulting to true"
+    LOG_ROTATION="true"
+elif [[ ! "$DRY_RUN" =~ ^[Tt]rue$|^[Ff]alse$ ]]; then
+    startup_log "[warning] Invalid value for LOG_ROTATION. defaulting to true."
+    LOG_ROTATION="true"
+fi
+if [[ "$LOG_ROTATION" == *"true"* ]]; then
+    if [ -z "$LOG_ROTATION_SIZE" ] || [ "$LOG_ROTATION_SIZE" = "null" ]; then
+        startup_log "[info] LOG_ROTATION_SIZE not specified, defaulting to 10MB"
+        LOG_ROTATION_SIZE=10
+    elif ! [[ "$LOG_ROTATION_SIZE" =~ ^[1-9][0-9]*$ ]]; then
+        startup_log "[warning] LOG_ROTATION_SIZE invalid, defaulting to 10MB"
+        LOG_ROTATION_SIZE=10
+    fi
+fi
+if [ -z "$REMOVE_OLD_LOGS" ] || [ "$REMOVE_OLD_LOGS" = "null" ]; then
+    startup_log "[info] REMOVE_OLD_LOGS option not specified, defaulting to true"
+    REMOVE_OLD_LOGS="true"
+elif [[ ! "$REMOVE_OLD_LOGS" =~ ^[Tt]rue$|^[Ff]alse$ ]]; then
+    startup_log "[warning] Invalid value for REMOVE_OLD_LOGS. defaulting to true."
+    REMOVE_OLD_LOGS="true"
+fi
+if [[ "$REMOVE_OLD_LOGS" == *"true"* ]]; then
+    if [ -z "$LOG_FILES_AMOUNT" ] || [ "$LOG_FILES_AMOUNT" = "null" ]; then
+        startup_log "[info] LOG_FILES_AMOUNT not specified, defaulting to 10"
+        LOG_FILES_AMOUNT=10
+    elif ! [[ "$LOG_FILES_AMOUNT" =~ ^[1-9][0-9]*$ ]]; then
+        startup_log "[warning] LOG_FILES_AMOUNT invalid, defaulting to 10"
+        LOG_FILES_AMOUNT=10
+    fi
+fi
+
 # Function to log messages and echo to the console
 log_message() {
+    local max_log_size
+    max_log_size=$((LOG_ROTATION_SIZE * 1048576))
     local timestamp
     local log_file_size
-    local backup_file
+    local previous_file
     timestamp=$(date +"%Y-%m-%d %H:%M:%S")
     local log_entry="[$timestamp] $1"
     
@@ -14,13 +79,29 @@ log_message() {
     # Log to file
     echo "$log_entry" >> "$LOG_FILE" 2>&1
     
-    # Rotate log file if it exceeds a certain size (e.g., 1 MB)
-    log_file_size=$(du -b "$LOG_FILE" | cut -f1)
-    local max_log_size=$((1024 * 1024))  # 1 MB
-    if [ "$log_file_size" -gt "$max_log_size" ]; then
-        backup_file="$LOG_FILE.$(date +%Y%m%d%H%M%S)"
-        mv "$LOG_FILE" "$backup_file"
-        echo "[info] Log file rotated. Old log file: $backup_file" >> "$LOG_FILE" 2>&1
+    if [[ "${LOG_ROTATION,,}" == "true" ]]; then
+        # Rotate log file if it exceeds a certain size
+        log_file_size=$(du -b "$LOG_FILE" | cut -f1)
+        if [ "$log_file_size" -gt "$max_log_size" ]; then
+            previous_file="$LOG_FILE.$(date +%Y%m%d%H%M%S)"
+            mv "$LOG_FILE" "$previous_file"
+            echo "[info] Log file rotated. Old log file: $previous_file" >> "$LOG_FILE" 2>&1
+        fi
+    fi
+    
+    if [[ "${REMOVE_OLD_LOGS,,}" == "true" ]]; then
+        # Remove old log files if there are more than LOG_FILES_AMOUNT
+        log_files_count=$(find "$(dirname "$LOG_FILE")" -maxdepth 1 -type f -name "$(basename "$LOG_FILE").*" 2>/dev/null | wc -l)
+
+        if [ "$log_files_count" -gt "$LOG_FILES_AMOUNT" ]; then
+            mapfile -t old_files < <(find "$(dirname "$LOG_FILE")" -maxdepth 1 -type f -name "$(basename "$LOG_FILE").*" -printf "%T@ %p\n" | sort -n | cut -d' ' -f2- | tail -n +$((LOG_FILES_AMOUNT + 1)))
+
+            # Check if old_files array is non-empty before attempting removal
+            if [[ "${#old_files[@]}" -gt 0 ]]; then
+                rm "${old_files[@]}"
+                echo "[info] Removed old log files. Count: $log_files_count, Keeping: $LOG_FILES_AMOUNT" >> "$LOG_FILE" 2>&1
+            fi
+        fi
     fi
 }
 
@@ -247,7 +328,6 @@ CONFIG="/config/cloudflare-ddns-config.yaml"
 # Source settings from the configuration file and/or ENV
 API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
 SLEEP_INTERVAL="${SLEEP_INT:-$(yq eval '.SLEEP_INTERVAL' "$CONFIG")}"
-LOG_FILE="${LOG_FILE_LOCATION:-$(yq eval '.LOG_FILE' "$CONFIG")}"
 DRY_RUN="${DRY_RUN_MODE:-$(yq eval '.DRY_RUN' "$CONFIG")}"
 
 # Load the JSON file into a variable
@@ -288,7 +368,7 @@ else
     log_message "[info] No missing settings found in the config file."
 fi
 
-# Check if config values  not specified/invalid and set defaults
+# Check if config values not specified/invalid and set defaults
 if [ -z "$DRY_RUN" ] || [ "$DRY_RUN" = "null" ]; then
     log_message "[info] Dry run option not specified, defaulting to false"
     DRY_RUN="false"
@@ -299,16 +379,9 @@ fi
 if [ -z "$SLEEP_INTERVAL" ] || [ "$SLEEP_INTERVAL" = "null" ]; then
     log_message "[info] Sleep interval not specified, defaulting to 900 seconds"
     SLEEP_INTERVAL="900"
-elif ! [[ "$SLEEP_INTERVAL" =~ ^[0-9]+$ ]]; then
+elif ! [[ "$SLEEP_INTERVAL" =~ ^[1-9][0-9]*$ ]]; then
     log_message "[warning] Invalid value for SLEEP_INTERVAL. defaulting to 900."
     SLEEP_INTERVAL="900"
-fi
-if [ -z "$LOG_FILE" ] || [ "$LOG_FILE" = "null" ]; then
-    log_message "[info] Log file location not specified, defaulting to /var/log/cloudflare-ddns/update_dns.log"
-    LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
-elif [ ! -d "$(dirname "$LOG_FILE")" ]; then
-    log_message "[warning] Invalid path for LOG_FILE. defaulting to /var/log/cloudflare-ddns/update_dns.log."
-    LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
 fi
 
 local_ipv6_address=$(ip -6 addr show scope global | grep inet6 | awk '{print $2}' | cut -d'/' -f1)

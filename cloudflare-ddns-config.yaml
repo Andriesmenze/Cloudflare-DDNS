@@ -16,3 +16,19 @@ LOG_FILE: "/var/log/cloudflare-ddns/update_dns.log"
 # Dry run mode (true or false)
 # Can also be set/overridden with the ENV Variable DRY_RUN_MODE
 DRY_RUN: "false"
+
+# Log rotation (true or false)
+# Can also be set/overridden with the ENV Variable ENABLE_LOG_ROTATION
+LOG_ROTATION: "true"
+
+# Log rotation size in MB
+# Can also be set/overridden with the ENV Variable MAX_LOG_SIZE
+LOG_ROTATION_SIZE: 10
+
+# Remove old logs (true or false)
+# Can also be set/overridden with the ENV Variable DELETE_OLD_LOGS
+REMOVE_OLD_LOGS: "true"
+
+# Amount of log files to keep
+# Can also be set/overridden with the ENV Variable LOG_FILES_AMOUNT
+LOG_FILES_AMOUNT: 10

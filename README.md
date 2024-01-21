@@ -68,8 +68,20 @@ Most settings can also be set/overrriden with the following environment variable
   All the log entries, including information, warnings, and errors, will be recorded in this file.  
 - **DRY_RUN_MODE**  
   Dry run mode is a feature that allows you to test the behavior without actually making changes to the Cloudflare DNS records.  
-  When set to "true," the script will log the changes it would make, but it won't apply them.  
+  When set to `true`, the script will log the changes it would make, but it won't apply them.  
   This is useful for verifying settings without affecting the DNS records.  
+- **ENABLE_LOG_ROTATION**  
+  Enable log rotation feature.  
+  Set to `true` to enable log rotation, or `false` to disable it.  
+- **MAX_LOG_SIZE**  
+  When log rotation is enabled this setting sets the maximum size of each log file in bytes.  
+  When a log file reaches this size, it will be rotated.  
+  Specify the size in megabytes, for example, 10MB.  
+- **DELETE_OLD_LOGS**  
+  Set to `true` to automatically delete old log files after rotation, or `false` to keep them.
+- **LOG_FILES_AMOUNT**  
+  When DELETE_OLD_LOGS is true this setting sets the number of log files to keep after rotation.  
+  Specify the desired amount, for example, 10 to keep the 10 most recent log files.  
 
 **Docker Compose Example**
 ```Dockerfile
@@ -103,6 +115,22 @@ LOG_FILE: "/var/log/cloudflare-ddns/update_dns.log"
 # Dry run mode (true or false)
 # Can also be set/overridden with the ENV Variable DRY_RUN_MODE
 DRY_RUN: "false"
+
+# Log rotation (true or false)
+# Can also be set/overridden with the ENV Variable ENABLE_LOG_ROTATION
+LOG_ROTATION: "true"
+
+# Log rotation size in MB
+# Can also be set/overridden with the ENV Variable MAX_LOG_SIZE
+LOG_ROTATION_SIZE: 10
+
+# Remove old logs (true or false)
+# Can also be set/overridden with the ENV Variable DELETE_OLD_LOGS
+REMOVE_OLD_LOGS: "true"
+
+# Amount of log files to keep
+# Can also be set/overridden with the ENV Variable LOG_FILES_AMOUNT
+LOG_FILES_AMOUNT: 10
 ```
 
 ## DNS Records Configuration (`dns-records.json`)
