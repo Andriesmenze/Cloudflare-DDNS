@@ -386,6 +386,7 @@ elif ! [[ "$SLEEP_INTERVAL" =~ ^[1-9][0-9]*$ ]]; then
     SLEEP_INTERVAL="900"
 fi
 
+# Check if the container has an IPv6 address
 local_ipv6_address=$(ip -6 addr show scope global | grep inet6 | awk '{print $2}' | cut -d'/' -f1)
 if [ -z "$local_ipv6_address" ]; then
     if grep -q '"record_type": "AAAA"' dns-records.json; then
