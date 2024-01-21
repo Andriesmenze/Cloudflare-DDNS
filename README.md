@@ -28,7 +28,7 @@ docker run \
 -v /your/path/or/volume:/config \
 -v /your/path/or/volume:/var/log/cloudflare-ddns \
 --network host \
-docker.io/library/cloudflare-ddns
+ghcr.io/andriesmenze/cloudflare-ddns
 ```
 3. Edit the cloudflare-ddns-config.yaml and dns-records.json file in the config folder and restart the container
 
@@ -39,7 +39,7 @@ git clone https://github.com/Andriesmenze/Cloudflare-DDNS.git
 ```
 2. Navigate to the project directory:
 ```bash
-cd cloudflare-dynamic-dns
+cd Cloudflare-DDNS
 ```
 3. Build the image:
 ```bash
@@ -54,6 +54,34 @@ docker run \
 docker.io/library/cloudflare-ddns
 ```
 5. Edit the cloudflare-ddns-config.yaml and dns-records.json file in the config folder and restart the container
+
+**Environment Variables**  
+Most settings can also be set/overrriden with the following environment variables.  
+- **CLOUDFLARE_API_TOKEN**  
+  This setting is used to specify the Cloudflare API token that the script will use to authenticate with the Cloudflare API when there is no alternate api token specified for the record.  
+  The API token is required for making requests to Cloudflare's services.  
+- **SLEEP_INT**  
+  The sleep interval determines how often the script checks for changes in the public IP address and updates DNS records if necessary.  
+  It's the time (in seconds) that the script waits before running again.  
+- **LOG_FILE_LOCATION**  
+  This setting specifies the file path where the script will write its log messages.  
+  All the log entries, including information, warnings, and errors, will be recorded in this file.  
+- **DRY_RUN_MODE**  
+  Dry run mode is a feature that allows you to test the behavior without actually making changes to the Cloudflare DNS records.  
+  When set to "true," the script will log the changes it would make, but it won't apply them.  
+  This is useful for verifying settings without affecting the DNS records.  
+
+**Docker Compose Example**
+```Dockerfile
+version: '3'
+services:
+  cloudflare-ddns:
+    image: ghcr.io/andriesmenze/cloudflare-ddns:latest
+    volumes:
+      - /your/path/or/volume:/config
+      - /your/path/or/volume:/var/log/cloudflare-ddns
+    network_mode: host
+```
 
 ## Cloudflare DDNS Configuration (`cloudflare-ddns-config.yaml`)
 ```yaml
