@@ -13,10 +13,12 @@ LOG_FILES_AMOUNT="${NUMBER_OF_LOG_FILES_TO_KEEP:-$(yq eval '.LOG_FILES_AMOUNT' "
 
 # Check if LOG_FILE is not specified/invalid and set default
 if [ -z "$LOG_FILE" ] || [ "$LOG_FILE" = "null" ]; then
-    echo "[info] Log file location not specified, defaulting to /var/log/cloudflare-ddns/update_dns.log"
+    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    echo "[$timestamp] [info] Log file location not specified, defaulting to /var/log/cloudflare-ddns/update_dns.log"
     LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
 elif [ ! -d "$(dirname "$LOG_FILE")" ]; then
-    echo "[warning] Invalid path for LOG_FILE. defaulting to /var/log/cloudflare-ddns/update_dns.log."
+    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
+    echo "[$timestamp] [warning] Invalid path for LOG_FILE. defaulting to /var/log/cloudflare-ddns/update_dns.log."
     LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
 fi
 
