@@ -58,7 +58,7 @@ docker.io/library/cloudflare-ddns
 **Environment Variables**  
 Most settings can also be set/overrriden with the following environment variables.  
 - **CLOUDFLARE_API_TOKEN**  
-  This setting is used to specify the Cloudflare API token that the script will use to authenticate with the Cloudflare API when there is no alternate api token specified for the record.  
+  This setting is used to specify the Cloudflare API token that the script will use to authenticate with the Cloudflare API when there is no alternate API token specified for the record.  
   The API token is required for making requests to Cloudflare's services.  
 - **SLEEP_INT**  
   The sleep interval determines how often the script checks for changes in the public IP address and updates DNS records if necessary.  

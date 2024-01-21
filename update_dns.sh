@@ -203,8 +203,8 @@ update_dns_record() {
 check_and_update_record() {
     # Check if the public IPv4 is different from the current DNS record value
     local public_ip=$1
+    output1=""
     output2=""
-    output3=""
     if [ "$public_ip" != "$record_content" ]; then
         output1="[info] Current value is different from Public IP, updating DNS Record for record ${subdomain:+"$subdomain."}$zone_name type $record_type in zone $zone_name"
         # Check if proxied is not set and assign a default value of true
@@ -218,12 +218,6 @@ check_and_update_record() {
             ttl="1"
         fi
         output2=$(update_dns_record "$public_ip")
-        # Check for errors during DNS record update
-        if [[ "$output2" == *"error"* ]]; then
-            output3="[error] Failed to update the DNS Record for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_name."
-        else
-            output3="[info] Changed the DNS Record for ${subdomain:+"$subdomain."}$zone_name type $record_type from $record_content to $public_ip"
-        fi
     else
         output1="[info] Public IP is the same as current value, skipping update for ${subdomain:+"$subdomain."}$zone_name in Zone $zone_name."
     fi
@@ -393,7 +387,7 @@ while true; do
             case "$record_type" in
                 "A")
                     check_and_update_record "$current_ipv4"
-                    for output in "$output1" "$output2" "$output3"; do
+                    for output in "$output1" "$output2"; do
                         if [ -n "$output" ]; then
                             log_message "$output"
                         fi
@@ -402,7 +396,7 @@ while true; do
                 "AAAA")
                     if [[ "$ipv6" == *"true"* ]]; then
                         check_and_update_record "$current_ipv6"
-                        for output in "$output1" "$output2" "$output3"; do
+                        for output in "$output1" "$output2"; do
                             if [ -n "$output" ]; then
                                 log_message "$output"
                             fi
