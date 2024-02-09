@@ -39,7 +39,7 @@ startup_log() {
 if [ -z "$LOG_ROTATION" ] || [ "$LOG_ROTATION" = "null" ]; then
     startup_log "[info] LOG_ROTATION option not specified, defaulting to true"
     LOG_ROTATION="true"
-elif [[ ! "$DRY_RUN" =~ ^[Tt]rue$|^[Ff]alse$ ]]; then
+elif [[ ! "$LOG_ROTATION" =~ ^[Tt]rue$|^[Ff]alse$ ]]; then
     startup_log "[warning] Invalid value for LOG_ROTATION. defaulting to true."
     LOG_ROTATION="true"
 fi
