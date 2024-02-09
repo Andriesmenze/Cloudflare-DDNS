@@ -1,25 +1,28 @@
 {
-  "ZONE_CONFIGS": [
+  "RECORDS_CONFIG": [
     {
       "zone_id": "ZONE_ID_1",
       "record_type": "A",
-      "record_name": "example.com",
       "subdomain": "",
-      "proxied": "true"
+      "proxied": "true",
+      "ttl": "1",
+      "alternate_api_token": "ALTERNATE_CLOUDFLARE_API_TOKEN"
     },
     {
       "zone_id": "ZONE_ID_2",
       "record_type": "AAAA",
-      "record_name": "example.org",
       "subdomain": "",
-      "proxied": "false"
+      "proxied": "false",
+      "ttl": "1",
+      "alternate_api_token": "ALTERNATE_CLOUDFLARE_API_TOKEN"
     },
     {
       "zone_id": "ZONE_ID_2",
       "record_type": "AAAA",
-      "record_name": "example.org",
       "subdomain": "www",
-      "proxied": "true"
+      "proxied": "true",
+      "ttl": "1",
+      "alternate_api_token": "ALTERNATE_CLOUDFLARE_API_TOKEN"
     }
   ]
 }

@@ -2,13 +2,33 @@
 
 # Cloudflare API Token
 # For more information visit https://developers.cloudflare.com/fundamentals/api/get-started/create-token/
-# Can also be set with the ENV Variable CLOUDFLARE_API_TOKEN
+# Can also be set/overridden with the ENV Variable CLOUDFLARE_API_TOKEN
 API_TOKEN: "YOUR_CLOUDFLARE_API_TOKEN"
 
 # Sleep Interval in seconds
-# Can also be set with the ENV Variable SLEEP_INT
+# Can also be set/overridden with the ENV Variable SLEEP_INT
 SLEEP_INTERVAL: 900
 
 # Log file location
-# Can also be set with the ENV Variable LOG_FILE_LOCATION
+# Can also be set/overridden with the ENV Variable LOG_FILE_LOCATION
 LOG_FILE: "/var/log/cloudflare-ddns/update_dns.log"
+
+# Dry run mode (true or false)
+# Can also be set/overridden with the ENV Variable DRY_RUN_MODE
+DRY_RUN: "false"
+
+# Log rotation (true or false)
+# Can also be set/overridden with the ENV Variable ENABLE_LOG_ROTATION
+LOG_ROTATION: "true"
+
+# Log rotation size in MB
+# Can also be set/overridden with the ENV Variable MAX_LOG_SIZE
+LOG_ROTATION_SIZE: 10
+
+# Remove old logs (true or false)
+# Can also be set/overridden with the ENV Variable DELETE_OLD_LOGS
+REMOVE_OLD_LOGS: "true"
+
+# Amount of log files to keep
+# Can also be set/overridden with the ENV Variable LOG_FILES_AMOUNT
+LOG_FILES_AMOUNT: 10
