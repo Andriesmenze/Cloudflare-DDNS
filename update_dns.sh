@@ -276,7 +276,7 @@ update_dns_record() {
             "name": "'$full_record_name'",
             "proxied": '$proxied',
             "type": "'$record_type'",
-            "ttl": "'$ttl'"
+            "ttl": '$ttl'
         }')
 
     # Check for errors in the response
@@ -421,7 +421,7 @@ while true; do
             zone_id=$(echo "$record" | jq -r '.zone_id')
             record_type=$(echo "$record" | jq -r '.record_type')
             proxied=$(echo "$record" | jq -r '.proxied')
-            ttl=$(echo "$record" | jq -r '.ttl')
+            ttl=$(echo "$record" | jq -r '.ttl | tonumber')
             subdomain=$(echo "$record" | jq -r '.subdomain')
             alternate_api_token=$(echo "$record" | jq -r '.alternate_api_token')
 
