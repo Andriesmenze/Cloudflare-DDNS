@@ -113,13 +113,15 @@ log_message() {
     echo "$entry" >> "$LOG_FILE"
 
     if [[ "$LOG_ROTATION" == "true" ]]; then
-        local max_bytes=$(( LOG_ROTATION_SIZE * 1048576 ))
+        local max_bytes
+        max_bytes=$(( LOG_ROTATION_SIZE * 1048576 ))
         local current_size
         current_size=$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)
         if (( current_size > max_bytes )); then
-            local rotated="$LOG_FILE.$(date '+%Y%m%d%H%M%S')"
+            local rotated
+            rotated="$LOG_FILE.$(date '+%Y%m%d%H%M%S')"
             mv "$LOG_FILE" "$rotated"
-            echo "[info] Log rotated → $rotated" >> "$LOG_FILE"
+            echo "[$ts] [info] Log rotated → $rotated" >> "$LOG_FILE"
         fi
     fi
 
@@ -129,7 +131,8 @@ log_message() {
         log_base=$(basename "$LOG_FILE")
         count=$(find "$log_dir" -maxdepth 1 -type f -name "${log_base}.*" 2>/dev/null | wc -l)
         if (( count > LOG_FILES_AMOUNT )); then
-            local excess=$(( count - LOG_FILES_AMOUNT ))
+            local excess old_files
+            excess=$(( count - LOG_FILES_AMOUNT ))
             mapfile -t old_files < <(
                 find "$log_dir" -maxdepth 1 -type f -name "${log_base}.*" -printf '%T@ %p\n' \
                 | sort -n \
@@ -138,7 +141,8 @@ log_message() {
             )
             if (( ${#old_files[@]} > 0 )); then
                 rm -- "${old_files[@]}"
-                log_message "[info] Removed $excess old log file(s), keeping $LOG_FILES_AMOUNT."
+                # Use echo directly to avoid re-entering log_message
+                echo "[$ts] [info] Removed $excess old log file(s), keeping $LOG_FILES_AMOUNT." >> "$LOG_FILE"
             fi
         fi
     fi
@@ -159,6 +163,28 @@ check_config_keys() {
         log_message "[warning] Config is missing keys (may use defaults): $formatted"
     else
         log_message "[info] Config keys look complete."
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Shared Cloudflare API response validator
+# Returns 1 and logs an error if the response is empty, invalid JSON, or
+# contains Cloudflare-reported errors.
+# ---------------------------------------------------------------------------
+_cf_check_response() {
+    local response="$1" context="$2"
+    local error_count
+    if [[ -z "$response" ]]; then
+        log_message "[error] Empty response from Cloudflare API ($context)"
+        return 1
+    fi
+    if ! error_count=$(jq -r '.errors | length' <<< "$response" 2>/dev/null); then
+        log_message "[error] Invalid JSON from Cloudflare API ($context)"
+        return 1
+    fi
+    if (( error_count > 0 )); then
+        log_message "[error] Cloudflare API error ($context): $(jq -r '.errors[0].message // "unknown"' <<< "$response")"
+        return 1
     fi
 }
 
@@ -207,8 +233,9 @@ test_api_token() {
     response=$(curl "${CURL_OPTS[@]}" -X GET \
         'https://api.cloudflare.com/client/v4/user/tokens/verify' \
         -H "Authorization: Bearer $token")
-    if [[ $(jq -r '.errors | length' <<< "$response") -gt 0 ]]; then
-        log_message "[error] API token validation failed: $(jq -r '.errors[0].message // "unknown error"' <<< "$response")"
+    _cf_check_response "$response" "token verify" || return 1
+    if ! jq -e '.success == true' <<< "$response" >/dev/null 2>&1; then
+        log_message "[error] API token is not valid (.success != true)"
         return 1
     fi
 }
@@ -220,24 +247,20 @@ get_zone_name() {
         "https://api.cloudflare.com/client/v4/zones/$zone_id" \
         -H "Authorization: Bearer $token" \
         -H 'Content-Type: application/json')
-    if [[ $(jq -r '.errors | length' <<< "$response") -gt 0 ]]; then
-        log_message "[error] Failed to get zone name for $zone_id: $(jq -r '.errors[0].message // "unknown error"' <<< "$response")"
-        return 1
-    fi
+    _cf_check_response "$response" "get zone $zone_id" || return 1
     jq -r '.result.name' <<< "$response"
 }
 
 get_dns_record() {
     local zone_id="$1" record_type="$2" full_name="$3" token="$4"
-    local response
+    # URL-encode the record name safely
+    local encoded_name response
+    encoded_name=$(printf '%s' "$full_name" | jq -Rr '@uri')
     response=$(curl "${CURL_OPTS[@]}" -X GET \
-        "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$record_type&name=$(jq -rn --arg n "$full_name" '$n | @uri')" \
+        "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$record_type&name=$encoded_name" \
         -H "Authorization: Bearer $token" \
         -H 'Content-Type: application/json')
-    if [[ $(jq -r '.errors | length' <<< "$response") -gt 0 ]]; then
-        log_message "[error] Failed to get DNS record $full_name ($record_type): $(jq -r '.errors[0].message // "unknown error"' <<< "$response")"
-        return 1
-    fi
+    _cf_check_response "$response" "get record $full_name ($record_type)" || return 1
     # Return "content record_id" for the first matching record
     jq -r '.result[0] | "\(.content) \(.id)"' <<< "$response"
 }
@@ -268,10 +291,7 @@ update_dns_record() {
         -H 'Content-Type: application/json' \
         --data "$payload")
 
-    if [[ $(jq -r '.errors | length' <<< "$response") -gt 0 ]]; then
-        log_message "[error] Failed to update $full_name ($record_type): $(jq -r '.errors[0].message // "unknown error"' <<< "$response")"
-        return 1
-    fi
+    _cf_check_response "$response" "update $full_name ($record_type)" || return 1
     log_message "[info] Updated $full_name ($record_type) → $new_ip"
 }
 
@@ -364,8 +384,16 @@ while true; do
         record_type=$(jq -r '.record_type'                 <<< "$record")
         subdomain=$(jq -r '.subdomain // ""'               <<< "$record")
         proxied=$(jq -r '.proxied // true'                 <<< "$record")
-        ttl=$(jq -r '.ttl // 1 | tonumber'                 <<< "$record")
         alt_token=$(jq -r '.alternate_api_token // ""'     <<< "$record")
+
+        # Validate and normalise TTL (must be a positive integer; default 1 = auto)
+        ttl_raw=$(jq -r '.ttl // 1' <<< "$record")
+        if [[ "$ttl_raw" =~ ^[0-9]+$ ]]; then
+            ttl="$ttl_raw"
+        else
+            log_message "[warning] Invalid TTL '$ttl_raw' for zone $zone_id, defaulting to 1."
+            ttl=1
+        fi
 
         # Normalise proxied to a JSON boolean (handles both string and boolean input)
         case "${proxied,,}" in
