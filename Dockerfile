@@ -1,4 +1,4 @@
-FROM alpine:3.21
+FROM alpine:3.23
 
 LABEL org.opencontainers.image.title="Cloudflare DDNS" \
       org.opencontainers.image.description="Automatically keeps Cloudflare DNS records in sync with your dynamic public IP" \
