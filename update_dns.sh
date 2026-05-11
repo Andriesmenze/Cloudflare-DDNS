@@ -1,506 +1,470 @@
 #!/bin/bash
+set -uo pipefail
 
-# Source the configuration files
+# ---------------------------------------------------------------------------
+# Cloudflare DDNS Updater
+# Detects public IPv4/IPv6 and updates Cloudflare DNS records when they change.
+# ---------------------------------------------------------------------------
+
 EXAMPLE_CONFIG="/app/cloudflare-ddns-config.yaml"
 CONFIG="/config/cloudflare-ddns-config.yaml"
+DNS_RECORDS_FILE="/config/dns-records.json"
 
-# Set Log file location and rotation settings
-LOG_FILE="${LOG_FILE_LOCATION:-$(yq eval '.LOG_FILE' "$CONFIG")}"
-LOG_ROTATION="${ENABLE_LOG_ROTATION:-$(yq eval '.LOG_ROTATION' "$CONFIG")}"
-LOG_ROTATION_SIZE="${MAX_LOG_SIZE:-$(yq eval '.LOG_ROTATION_SIZE' "$CONFIG")}"
-REMOVE_OLD_LOGS="${DELETE_OLD_LOGS:-$(yq eval '.REMOVE_OLD_LOGS' "$CONFIG")}"
-LOG_FILES_AMOUNT="${NUMBER_OF_LOG_FILES_TO_KEEP:-$(yq eval '.LOG_FILES_AMOUNT' "$CONFIG")}"
+# Timeout options applied to every curl call
+CURL_OPTS=(--silent --max-time 10 --connect-timeout 5)
 
-# Check if LOG_FILE is not specified/invalid and set default
-if [ -z "$LOG_FILE" ] || [ "$LOG_FILE" = "null" ]; then
-    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-    echo "[$timestamp] [info] Log file location not specified, defaulting to /var/log/cloudflare-ddns/update_dns.log"
-    LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
-elif [ ! -d "$(dirname "$LOG_FILE")" ]; then
-    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-    echo "[$timestamp] [warning] Invalid path for LOG_FILE. defaulting to /var/log/cloudflare-ddns/update_dns.log."
-    LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
-fi
+# ---------------------------------------------------------------------------
+# Bootstrap: set a safe default log path before the config is available
+# ---------------------------------------------------------------------------
+LOG_FILE="/var/log/cloudflare-ddns/update_dns.log"
 
-# Function to log startup messages before log_message is defined
-startup_log() {
-    local timestamp
-    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-    local log_entry="[$timestamp] $1"
-    
-    # Print log entry to console
-    echo "$log_entry"
-    
-    # Log to file
-    echo "$log_entry" >> "$LOG_FILE" 2>&1
+_bootstrap_log() {
+    local ts
+    ts=$(date '+%Y-%m-%d %H:%M:%S')
+    local entry="[$ts] $1"
+    echo "$entry"
+    echo "$entry" >> "$LOG_FILE" 2>/dev/null || true
 }
 
-# Check if log config values not specified/invalid and set defaults
-if [ -z "$LOG_ROTATION" ] || [ "$LOG_ROTATION" = "null" ]; then
-    startup_log "[info] LOG_ROTATION option not specified, defaulting to true"
-    LOG_ROTATION="true"
-elif [[ ! "$LOG_ROTATION" =~ ^[Tt]rue$|^[Ff]alse$ ]]; then
-    startup_log "[warning] Invalid value for LOG_ROTATION. defaulting to true."
-    LOG_ROTATION="true"
+# ---------------------------------------------------------------------------
+# Copy default config files on first run
+# ---------------------------------------------------------------------------
+if [[ ! -f "$CONFIG" ]]; then
+    cp "$EXAMPLE_CONFIG" "$CONFIG"
+    _bootstrap_log "[info] Created default config: $CONFIG — edit it before use."
 fi
-if [[ "$LOG_ROTATION" == *"true"* ]]; then
-    if [ -z "$LOG_ROTATION_SIZE" ] || [ "$LOG_ROTATION_SIZE" = "null" ]; then
-        startup_log "[info] LOG_ROTATION_SIZE not specified, defaulting to 10MB"
-        LOG_ROTATION_SIZE=10
-    elif ! [[ "$LOG_ROTATION_SIZE" =~ ^[1-9][0-9]*$ ]]; then
-        startup_log "[warning] LOG_ROTATION_SIZE invalid, defaulting to 10MB"
-        LOG_ROTATION_SIZE=10
+if [[ ! -f "$DNS_RECORDS_FILE" ]]; then
+    cp /app/dns-records.json "$DNS_RECORDS_FILE"
+    _bootstrap_log "[info] Created default DNS records file: $DNS_RECORDS_FILE — edit it before use."
+fi
+
+# ---------------------------------------------------------------------------
+# Dependency check
+# ---------------------------------------------------------------------------
+for _cmd in curl yq jq; do
+    if ! command -v "$_cmd" &>/dev/null; then
+        _bootstrap_log "[error] Required tool not found: $_cmd — exiting."
+        exit 1
     fi
-fi
-if [ -z "$REMOVE_OLD_LOGS" ] || [ "$REMOVE_OLD_LOGS" = "null" ]; then
-    startup_log "[info] REMOVE_OLD_LOGS option not specified, defaulting to true"
-    REMOVE_OLD_LOGS="true"
-elif [[ ! "$REMOVE_OLD_LOGS" =~ ^[Tt]rue$|^[Ff]alse$ ]]; then
-    startup_log "[warning] Invalid value for REMOVE_OLD_LOGS. defaulting to true."
-    REMOVE_OLD_LOGS="true"
-fi
-if [[ "$REMOVE_OLD_LOGS" == *"true"* ]]; then
-    if [ -z "$LOG_FILES_AMOUNT" ] || [ "$LOG_FILES_AMOUNT" = "null" ]; then
-        startup_log "[info] LOG_FILES_AMOUNT not specified, defaulting to 10"
-        LOG_FILES_AMOUNT=10
-    elif ! [[ "$LOG_FILES_AMOUNT" =~ ^[1-9][0-9]*$ ]]; then
-        startup_log "[warning] LOG_FILES_AMOUNT invalid, defaulting to 10"
-        LOG_FILES_AMOUNT=10
+done
+
+# ---------------------------------------------------------------------------
+# Read configuration (environment variables take precedence over config file)
+# ---------------------------------------------------------------------------
+_cfg() { yq eval "${1} // \"\"" "$CONFIG" 2>/dev/null || true; }
+
+LOG_FILE_CFG="${LOG_FILE_LOCATION:-$(_cfg '.LOG_FILE')}"
+if [[ -n "$LOG_FILE_CFG" && "$LOG_FILE_CFG" != "null" ]]; then
+    if [[ ! -d "$(dirname "$LOG_FILE_CFG")" ]]; then
+        _bootstrap_log "[warning] Invalid LOG_FILE path '$LOG_FILE_CFG', keeping default."
+    else
+        LOG_FILE="$LOG_FILE_CFG"
     fi
 fi
 
-# Function to log messages and echo to the console
+API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(_cfg '.API_TOKEN')}"
+SLEEP_INTERVAL="${SLEEP_INT:-$(_cfg '.SLEEP_INTERVAL')}"
+DRY_RUN="${DRY_RUN_MODE:-$(_cfg '.DRY_RUN')}"
+LOG_ROTATION="${ENABLE_LOG_ROTATION:-$(_cfg '.LOG_ROTATION')}"
+LOG_ROTATION_SIZE="${MAX_LOG_SIZE:-$(_cfg '.LOG_ROTATION_SIZE')}"
+REMOVE_OLD_LOGS="${DELETE_OLD_LOGS:-$(_cfg '.REMOVE_OLD_LOGS')}"
+LOG_FILES_AMOUNT="${NUMBER_OF_LOG_FILES_TO_KEEP:-$(_cfg '.LOG_FILES_AMOUNT')}"
+
+# ---------------------------------------------------------------------------
+# Normalize helpers
+# ---------------------------------------------------------------------------
+_normalize_bool() {
+    local val="${1,,}" default="$2" name="$3"
+    case "$val" in
+        true|false) echo "$val" ;;
+        ""|null)    _bootstrap_log "[info] $name not set, defaulting to $default."; echo "$default" ;;
+        *)          _bootstrap_log "[warning] Invalid value for $name ('$1'), defaulting to $default."; echo "$default" ;;
+    esac
+}
+
+_normalize_posint() {
+    local val="$1" default="$2" name="$3"
+    if [[ -z "$val" || "$val" == "null" ]]; then
+        _bootstrap_log "[info] $name not set, defaulting to $default."
+        echo "$default"
+    elif [[ "$val" =~ ^[1-9][0-9]*$ ]]; then
+        echo "$val"
+    else
+        _bootstrap_log "[warning] Invalid value for $name ('$val'), defaulting to $default."
+        echo "$default"
+    fi
+}
+
+DRY_RUN=$(_normalize_bool "${DRY_RUN:-}" "false" "DRY_RUN")
+SLEEP_INTERVAL=$(_normalize_posint "${SLEEP_INTERVAL:-}" "900" "SLEEP_INTERVAL")
+LOG_ROTATION=$(_normalize_bool "${LOG_ROTATION:-}" "true" "LOG_ROTATION")
+LOG_ROTATION_SIZE=$(_normalize_posint "${LOG_ROTATION_SIZE:-}" "10" "LOG_ROTATION_SIZE")
+REMOVE_OLD_LOGS=$(_normalize_bool "${REMOVE_OLD_LOGS:-}" "true" "REMOVE_OLD_LOGS")
+LOG_FILES_AMOUNT=$(_normalize_posint "${LOG_FILES_AMOUNT:-}" "10" "LOG_FILES_AMOUNT")
+
+# ---------------------------------------------------------------------------
+# Full logging function (with rotation)
+# ---------------------------------------------------------------------------
 log_message() {
-    local max_log_size
-    max_log_size=$((LOG_ROTATION_SIZE * 1048576))
-    local timestamp
-    local log_file_size
-    local previous_file
-    timestamp=$(date +"%Y-%m-%d %H:%M:%S")
-    local log_entry="[$timestamp] $1"
-    
-    # Print log entry to console
-    echo "$log_entry"
-    
-    # Log to file
-    echo "$log_entry" >> "$LOG_FILE" 2>&1
-    
-    if [[ "${LOG_ROTATION,,}" == "true" ]]; then
-        # Rotate log file if it exceeds a certain size
-        log_file_size=$(du -b "$LOG_FILE" | cut -f1)
-        if [ "$log_file_size" -gt "$max_log_size" ]; then
-            previous_file="$LOG_FILE.$(date +%Y%m%d%H%M%S)"
-            mv "$LOG_FILE" "$previous_file"
-            echo "[info] Log file rotated. Old log file: $previous_file" >> "$LOG_FILE" 2>&1
+    local ts
+    ts=$(date '+%Y-%m-%d %H:%M:%S')
+    local entry="[$ts] $1"
+    echo "$entry"
+    echo "$entry" >> "$LOG_FILE"
+
+    if [[ "$LOG_ROTATION" == "true" ]]; then
+        local max_bytes
+        max_bytes=$(( LOG_ROTATION_SIZE * 1048576 ))
+        local current_size
+        current_size=$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)
+        if (( current_size > max_bytes )); then
+            local rotated
+            rotated="$LOG_FILE.$(date '+%Y%m%d%H%M%S')"
+            mv "$LOG_FILE" "$rotated"
+            echo "[$ts] [info] Log rotated → $rotated" >> "$LOG_FILE"
         fi
     fi
-    
-    if [[ "${REMOVE_OLD_LOGS,,}" == "true" ]]; then
-        # Remove old log files if there are more than LOG_FILES_AMOUNT
-        log_files_count=$(find "$(dirname "$LOG_FILE")" -maxdepth 1 -type f -name "$(basename "$LOG_FILE").*" 2>/dev/null | wc -l)
 
-        if [ "$log_files_count" -gt "$LOG_FILES_AMOUNT" ]; then
-            mapfile -t old_files < <(find "$(dirname "$LOG_FILE")" -maxdepth 1 -type f -name "$(basename "$LOG_FILE").*" -printf "%T@ %p\n" | sort -n | cut -d' ' -f2- | tail -n +$((LOG_FILES_AMOUNT + 1)))
-
-            # Check if old_files array is non-empty before attempting removal
-            if [[ "${#old_files[@]}" -gt 0 ]]; then
-                rm "${old_files[@]}"
-                echo "[info] Removed old log files. Count: $log_files_count, Keeping: $LOG_FILES_AMOUNT" >> "$LOG_FILE" 2>&1
+    if [[ "$REMOVE_OLD_LOGS" == "true" ]]; then
+        local log_dir log_base count
+        log_dir=$(dirname "$LOG_FILE")
+        log_base=$(basename "$LOG_FILE")
+        count=$(find "$log_dir" -maxdepth 1 -type f -name "${log_base}.*" 2>/dev/null | wc -l)
+        if (( count > LOG_FILES_AMOUNT )); then
+            local excess old_files
+            excess=$(( count - LOG_FILES_AMOUNT ))
+            mapfile -t old_files < <(
+                find "$log_dir" -maxdepth 1 -type f -name "${log_base}.*" -printf '%T@ %p\n' \
+                | sort -n \
+                | head -n "$excess" \
+                | cut -d' ' -f2-
+            )
+            if (( ${#old_files[@]} > 0 )); then
+                rm -- "${old_files[@]}"
+                # Use echo directly to avoid re-entering log_message
+                echo "[$ts] [info] Removed $excess old log file(s), keeping $LOG_FILES_AMOUNT." >> "$LOG_FILE"
             fi
         fi
     fi
 }
 
-# Check if curl is installed
-if ! command -v curl &> /dev/null; then
-    log_message "[error] curl is not installed." >&2
-    exit 1
-fi
-
-# Check if yq is installed
-if ! command -v yq &> /dev/null; then
-    log_message "[error] yq is not installed." >&2
-    exit 1
-fi
-
-# Check if jq is installed
-if ! command -v jq &> /dev/null; then
-    log_message "[error] jq is not installed." >&2
-    exit 1
-fi
-
-# Check if awk is installed
-if ! command -v awk &> /dev/null; then
-    log_message "[error] awk is not installed." >&2
-    exit 1
-fi
-
-# Convert YAML to JSON using awk, tr, and sed
-yaml_to_json() {
-    local yaml_file=$1
-    local json
-
-    json=$(awk '
-        BEGIN {
-            FS=": ";
-            print "{"
-        }
-        !/^[[:space:]]*#/ && NF {
-            gsub(/^ +| +$/, "", $1);
-            gsub(/^ +| +$/, "", $2);
-
-            if ($2 == "") {
-                printf("\"%s\": {", $1);
-            } else {
-                gsub(/^"|"$/, "", $2);
-                printf("\"%s\": \"%s\",", $1, $2);
-            }
-        }
-        END {
-            if (NR > 0) {
-                sub(/,$/, "");
-                print "\n}"
-            } else {
-                print "}"
-            }
-        }
-    ' "$yaml_file" | tr -d '\n' | sed 's/,\s*}$/}/')
-
-    echo "$json"
+# ---------------------------------------------------------------------------
+# Check user config for missing keys (compared to bundled example)
+# ---------------------------------------------------------------------------
+check_config_keys() {
+    local missing
+    missing=$(comm -23 \
+        <(yq eval 'keys | .[]' "$EXAMPLE_CONFIG" 2>/dev/null | sort) \
+        <(yq eval 'keys | .[]' "$CONFIG" 2>/dev/null | sort) \
+    )
+    if [[ -n "$missing" ]]; then
+        local formatted
+        formatted=$(echo "$missing" | tr '\n' ',' | sed 's/,$//;s/,/, /g')
+        log_message "[warning] Config is missing keys (may use defaults): $formatted"
+    else
+        log_message "[info] Config keys look complete."
+    fi
 }
 
-# Function to get the current public IP address
+# ---------------------------------------------------------------------------
+# Shared Cloudflare API response validator
+# Returns 1 and logs an error if the response is empty, invalid JSON, or
+# contains Cloudflare-reported errors.
+# ---------------------------------------------------------------------------
+_cf_check_response() {
+    local response="$1" context="$2"
+    local error_count
+    if [[ -z "$response" ]]; then
+        log_message "[error] Empty response from Cloudflare API ($context)"
+        return 1
+    fi
+    if ! error_count=$(jq -r '.errors | length' <<< "$response" 2>/dev/null); then
+        log_message "[error] Invalid JSON from Cloudflare API ($context)"
+        return 1
+    fi
+    if (( error_count > 0 )); then
+        log_message "[error] Cloudflare API error ($context): $(jq -r '.errors[0].message // "unknown"' <<< "$response")"
+        return 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Public IP detection
+# Prefers Cloudflare's own trace endpoint; falls back to ipify.
+# ---------------------------------------------------------------------------
 get_public_ip() {
-    local version=$1
-    local ip_ipify
-    local ip_cloudflare
+    local version="$1"
+    local ip_cf ip_ipify
 
     case "$version" in
-        "v4")
-            ip_ipify=$(curl -s https://api.ipify.org?format=text)
-            ip_cloudflare=$(curl -s https://1.1.1.1/cdn-cgi/trace | grep "ip=" | cut -d'=' -f2)
+        v4)
+            ip_cf=$(curl "${CURL_OPTS[@]}" 'https://1.1.1.1/cdn-cgi/trace' 2>/dev/null \
+                | grep '^ip=' | cut -d= -f2 || true)
+            ip_ipify=$(curl "${CURL_OPTS[@]}" 'https://api.ipify.org?format=text' 2>/dev/null || true)
             ;;
-        "v6")
-            ip_ipify=$(curl -s https://api64.ipify.org?format=text)
-            ip_cloudflare=$(curl -s 'https://[2606:4700:4700::1111]/cdn-cgi/trace' | grep "ip=" | cut -d'=' -f2)
+        v6)
+            ip_cf=$(curl "${CURL_OPTS[@]}" 'https://[2606:4700:4700::1111]/cdn-cgi/trace' 2>/dev/null \
+                | grep '^ip=' | cut -d= -f2 || true)
+            ip_ipify=$(curl "${CURL_OPTS[@]}" 'https://api6.ipify.org?format=text' 2>/dev/null || true)
             ;;
         *)
-            # Log invalid ip version
-            log_message "[error] Invalid ip version."
+            log_message "[error] get_public_ip: invalid version '$version'"
+            return 1
             ;;
     esac
 
-    # Check if both responses are not empty
-    if [ -n "$ip_ipify" ] && [ -n "$ip_cloudflare" ]; then
-        # Check if the IP addresses are the same
-        if [ "$ip_ipify" = "$ip_cloudflare" ]; then
-            echo "$ip_cloudflare"
-        else
-            # Log and use Cloudflare's IP address when they are different
-            echo "$ip_cloudflare"
-        fi
-    elif [ -n "$ip_cloudflare" ]; then
-        # Use IP address from Cloudflare when api.ipify.org's response is empty
-        echo "$ip_cloudflare".
-    elif [ -n "$ip_ipify" ]; then
-        # Use IP address from api.ipify.org when Cloudflare's response is empty
+    if [[ -n "$ip_cf" ]]; then
+        echo "$ip_cf"
+    elif [[ -n "$ip_ipify" ]]; then
+        log_message "[warning] Cloudflare trace unavailable for $version, using ipify fallback."
         echo "$ip_ipify"
     else
-        # Log and return error when both responses are empty
-        log_message "[error] Unable to retrieve public IP address."
+        log_message "[error] Could not determine public IP ($version) from any source."
+        return 1
     fi
 }
 
-# Function to test Cloudflare API token
+# ---------------------------------------------------------------------------
+# Cloudflare API helpers
+# ---------------------------------------------------------------------------
 test_api_token() {
+    local token="$1"
     local response
-    local TOKEN=$1
-    response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/user/tokens/verify" \
-        -H "Authorization: Bearer $TOKEN")
-
-    # Check for errors in the response
-    if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
-        echo "[error] Error testing API token: $response"
-    else
-        echo "[info] The Cloudflare API token is valid."
+    response=$(curl "${CURL_OPTS[@]}" -X GET \
+        'https://api.cloudflare.com/client/v4/user/tokens/verify' \
+        -H "Authorization: Bearer $token")
+    _cf_check_response "$response" "token verify" || return 1
+    if ! jq -e '.success == true' <<< "$response" >/dev/null 2>&1; then
+        log_message "[error] API token is not valid (.success != true)"
+        return 1
     fi
 }
 
-# Function to get Zone name
 get_zone_name() {
-    local response    
-
-    response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id" \
-        -H "Authorization: Bearer $API_TOKEN" \
-        -H "Content-Type: application/json")
-
-    if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
-        echo "[error] Failed to get zone name for $zone_id: $response"
-    else
-        jq -r '.result.name' <<< "$response"
-    fi
-}
-
-# Function to get DNS record
-get_dns_record_value() {
-    local full_record_name="${subdomain:+"$subdomain."}$zone_name"
+    local zone_id="$1" token="$2"
     local response
-
-    response=$(curl -s -X GET "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$record_type&name=$full_record_name" \
-        -H "Authorization: Bearer $API_TOKEN" \
-        -H "Content-Type: application/json")
-
-    if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
-        echo "[error] Failed to get value for DNS record $full_record_name type $record_type in zone $zone_name: $response"
-    else
-        jq -r '.result[] | "\(.content) \(.id) "' <<< "$response"
-    fi
+    response=$(curl "${CURL_OPTS[@]}" -X GET \
+        "https://api.cloudflare.com/client/v4/zones/$zone_id" \
+        -H "Authorization: Bearer $token" \
+        -H 'Content-Type: application/json')
+    _cf_check_response "$response" "get zone $zone_id" || return 1
+    jq -r '.result.name' <<< "$response"
 }
 
-# Function to update DNS record
+get_dns_record() {
+    local zone_id="$1" record_type="$2" full_name="$3" token="$4"
+    # URL-encode the record name safely
+    local encoded_name response
+    encoded_name=$(printf '%s' "$full_name" | jq -Rr '@uri')
+    response=$(curl "${CURL_OPTS[@]}" -X GET \
+        "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records?type=$record_type&name=$encoded_name" \
+        -H "Authorization: Bearer $token" \
+        -H 'Content-Type: application/json')
+    _cf_check_response "$response" "get record $full_name ($record_type)" || return 1
+    # Return "content record_id" for the first matching record
+    jq -r '.result[0] | "\(.content) \(.id)"' <<< "$response"
+}
+
 update_dns_record() {
-    local new_ip=$1
-    local full_record_name="${subdomain:+"$subdomain."}$zone_name"
+    local zone_id="$1" record_id="$2" full_name="$3" record_type="$4"
+    local new_ip="$5" proxied="$6" ttl="$7" token="$8"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        log_message "[dry-run] Would update $full_name ($record_type) → $new_ip (proxied=$proxied, ttl=$ttl)"
+        return 0
+    fi
+
+    # Build the JSON payload safely with jq to prevent injection
+    local payload
+    payload=$(jq -n \
+        --arg  content  "$new_ip" \
+        --arg  name     "$full_name" \
+        --arg  type     "$record_type" \
+        --argjson proxied "$proxied" \
+        --argjson ttl     "$ttl" \
+        '{content: $content, name: $name, type: $type, proxied: $proxied, ttl: $ttl}')
+
     local response
+    response=$(curl "${CURL_OPTS[@]}" -X PUT \
+        "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records/$record_id" \
+        -H "Authorization: Bearer $token" \
+        -H 'Content-Type: application/json' \
+        --data "$payload")
 
-    if [[ "${DRY_RUN,,}" == "true" ]]; then
-        log_message "Dry run mode: Simulating DNS record update for ${subdomain:+"$subdomain."}$zone_name type $record_type in zone $zone_name."
-        return  # Exit the function without making actual updates
-    fi
-
-    response=$(curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$zone_id/dns_records/$record_id" \
-        -H "Authorization: Bearer $API_TOKEN" \
-        -H "Content-Type: application/json" \
-        --data '{
-            "content": "'$new_ip'",
-            "name": "'$full_record_name'",
-            "proxied": '$proxied',
-            "type": "'$record_type'",
-            "ttl": '$ttl'
-        }')
-
-    # Check for errors in the response
-    if [[ $(echo "$response" | jq -r '.errors | length') -gt 0 ]]; then
-        echo "[error] Error updating DNS record for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_name: $response"
-    else
-        echo "[info] DNS record updated successfully for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_name."
-    fi
+    _cf_check_response "$response" "update $full_name ($record_type)" || return 1
+    log_message "[info] Updated $full_name ($record_type) → $new_ip"
 }
 
-check_and_update_record() {
-    # Check if the public IPv4 is different from the current DNS record value
-    local public_ip=$1
-    output1=""
-    output2=""
-    if [ "$public_ip" != "$record_content" ]; then
-        output1="[info] Current value is different from Public IP, updating DNS Record for record ${subdomain:+"$subdomain."}$zone_name type $record_type in zone $zone_name"
-        # Check if proxied is not set and assign a default value of true
-        if [ -z "$proxied" ] || [ "$proxied" = "null" ]; then
-            log_message "[info] proxied not set for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_name, defaulting to true."
-            proxied="true"
-        fi
-        # Check if ttl is not set and assign a default value of 1
-        if [ -z "$ttl" ] || [ "$ttl" = "null" ]; then
-            log_message "[info] ttl not set for ${subdomain:+"$subdomain."}$zone_name type $record_type in Zone $zone_name, defaulting to 1(Auto)."
-            ttl="1"
-        fi
-        output2=$(update_dns_record "$public_ip")
-    else
-        output1="[info] Public IP is the same as current value, skipping update for ${subdomain:+"$subdomain."}$zone_name in Zone $zone_name."
-    fi
-}
-
-# Signal handler function
+# ---------------------------------------------------------------------------
+# Signal handler — allows graceful shutdown via SIGTERM / SIGINT
+# ---------------------------------------------------------------------------
 cleanup() {
-    log_message "[info] Received termination signal, exiting."
+    log_message "[info] Termination signal received, exiting."
     exit 0
 }
-
-# Register the cleanup function to handle termination signals
 trap cleanup SIGTERM SIGINT
 
-# Create config files if they don't exist
-if [ ! -f /config/cloudflare-ddns-config.yaml ]; then
-    cp /app/cloudflare-ddns-config.yaml /config/cloudflare-ddns-config.yaml
+# ---------------------------------------------------------------------------
+# Load and validate DNS records config
+# ---------------------------------------------------------------------------
+if [[ ! -f "$DNS_RECORDS_FILE" ]]; then
+    log_message "[error] DNS records file not found: $DNS_RECORDS_FILE"
+    exit 1
 fi
-if [ ! -f /config/dns-records.json ]; then
-    cp /app/dns-records.json /config/dns-records.json
+DNS_RECORDS_JSON=$(cat "$DNS_RECORDS_FILE")
+
+if ! jq -e '.RECORDS_CONFIG' <<< "$DNS_RECORDS_JSON" >/dev/null 2>&1; then
+    log_message "[error] RECORDS_CONFIG key not found in $DNS_RECORDS_FILE"
+    exit 1
 fi
-
-# Source settings from the configuration file and/or ENV
-API_TOKEN="${CLOUDFLARE_API_TOKEN:-$(yq eval '.API_TOKEN' "$CONFIG")}"
-SLEEP_INTERVAL="${SLEEP_INT:-$(yq eval '.SLEEP_INTERVAL' "$CONFIG")}"
-DRY_RUN="${DRY_RUN_MODE:-$(yq eval '.DRY_RUN' "$CONFIG")}"
-
-# Load the JSON file into a variable
-DNS_RECORDS_JSON=$(cat /config/dns-records.json)
-
-# Check if RECORDS_CONFIG key exists in JSON
-if jq -e '.RECORDS_CONFIG' <<< "$DNS_RECORDS_JSON" >/dev/null; then
-    # Convert JSON array to Bash array
-    IFS=$'\n' read -d '' -ra RECORDS_CONFIG < <(echo "$DNS_RECORDS_JSON" | jq -c '.RECORDS_CONFIG[]')
-    
-    # Check if the array is not empty
-    if [ ${#RECORDS_CONFIG[@]} -eq 0 ]; then
-        log_message "[error] No records found in the RECORDS_CONFIG array in dns-records.json, exiting."
-        exit 1
-    fi
-else
-    log_message "[error] RECORDS_CONFIG key not found in dns-records.json, exiting."
+mapfile -t RECORDS_CONFIG < <(jq -c '.RECORDS_CONFIG[]' <<< "$DNS_RECORDS_JSON")
+if [[ ${#RECORDS_CONFIG[@]} -eq 0 ]]; then
+    log_message "[error] No records found in RECORDS_CONFIG in $DNS_RECORDS_FILE"
     exit 1
 fi
 
-# Converting config files to json
-example_config_json=$(yaml_to_json "$EXAMPLE_CONFIG")
-config_json=$(yaml_to_json "$CONFIG")
+check_config_keys
 
-# Extracting the keys from the json files
-keys_example_config_json=$(echo "$example_config_json" | jq -r 'keys_unsorted | .[]')
-keys_config_json=$(echo "$config_json" | jq -r 'keys_unsorted | .[]')
+# ---------------------------------------------------------------------------
+# Validate API token configuration
+# ---------------------------------------------------------------------------
+if [[ -z "$API_TOKEN" || "$API_TOKEN" == "null" || "$API_TOKEN" == "YOUR_CLOUDFLARE_API_TOKEN" ]]; then
+    log_message "[error] API token is not configured. Set CLOUDFLARE_API_TOKEN or update $CONFIG"
+    exit 1
+fi
 
-# Use diff to find missing keys in config_json
-missing_keys=$(comm -23 <(echo "$keys_example_config_json" | sort) <(echo "$keys_config_json" | sort))
-
-# Comparing the config files for missing settings
-if [ -n "$missing_keys" ]; then
-    formatted_missing_keys=$(echo "$missing_keys" | tr '\n' ',' | sed 's/,$//;s/,/, /g')
-    log_message "[warning] Missing settings found in the config file."
-    log_message "[warning] Missing settings: $formatted_missing_keys"
+# ---------------------------------------------------------------------------
+# Detect IPv6 availability
+# ---------------------------------------------------------------------------
+IPV6_AVAILABLE=false
+if ip -6 addr show scope global 2>/dev/null | grep -q 'inet6'; then
+    IPV6_AVAILABLE=true
 else
-    log_message "[info] No missing settings found in the config file."
-fi
-
-# Check if config values not specified/invalid and set defaults
-if [ -z "$DRY_RUN" ] || [ "$DRY_RUN" = "null" ]; then
-    log_message "[info] Dry run option not specified, defaulting to false"
-    DRY_RUN="false"
-elif [[ ! "$DRY_RUN" =~ ^[Tt]rue$|^[Ff]alse$ ]]; then
-    log_message "[warning] Invalid value for DRY_RUN. defaulting to false."
-    DRY_RUN="false"
-fi
-if [ -z "$SLEEP_INTERVAL" ] || [ "$SLEEP_INTERVAL" = "null" ]; then
-    log_message "[info] Sleep interval not specified, defaulting to 900 seconds"
-    SLEEP_INTERVAL="900"
-elif ! [[ "$SLEEP_INTERVAL" =~ ^[1-9][0-9]*$ ]]; then
-    log_message "[warning] Invalid value for SLEEP_INTERVAL. defaulting to 900."
-    SLEEP_INTERVAL="900"
-fi
-
-# Check if the container has an IPv6 address
-local_ipv6_address=$(ip -6 addr show scope global | grep inet6 | awk '{print $2}' | cut -d'/' -f1)
-if [ -z "$local_ipv6_address" ]; then
-    if grep -q '"record_type": "AAAA"' dns-records.json; then
-        log_message "[error] Container does not have an IPv6 address, make sure the host has IPv6 enabled and the container is on the host network."
+    if jq -e '.RECORDS_CONFIG[] | select(.record_type == "AAAA")' <<< "$DNS_RECORDS_JSON" >/dev/null 2>&1; then
+        log_message "[warning] AAAA records configured but no global IPv6 address found on this host."
+        log_message "[warning] Ensure the host has IPv6 and the container uses host networking."
     else
-        log_message "[info] Container does not have an IPv6 address."
+        log_message "[info] No IPv6 address detected (no AAAA records configured)."
     fi
-    ipv6="false"
-else
-    ipv6="true"
 fi
 
-log_message "[info] Script has initialised"
+log_message "[info] Cloudflare DDNS updater started — interval=${SLEEP_INTERVAL}s, dry-run=${DRY_RUN}, ipv6=${IPV6_AVAILABLE}"
+
+# ---------------------------------------------------------------------------
 # Main loop
+# ---------------------------------------------------------------------------
 while true; do
 
-    # Test the cloudflare API Token
-    token_status=$(test_api_token "$API_TOKEN")
-    log_message "$token_status"
-    if [[ "$token_status" != *"error"* && -n "$API_TOKEN" && "$API_TOKEN" != "YOUR_CLOUDFLARE_API_TOKEN" ]]; then
-
-        # Retrieve the current public IPv4 and IPv6 addresses
-        current_ipv4=$(get_public_ip "v4")
-        log_message "[info] Current public IPV4 address is $current_ipv4"
-        if [[ "$ipv6" == *"true"* ]]; then
-            current_ipv6=$(get_public_ip "v6")
-            log_message "[info] Current public IPV6 address is $current_ipv6"
-        fi
-
-        # Iterate through each configured DNS record
-        for record in "${RECORDS_CONFIG[@]}"; do
-            zone_id=$(echo "$record" | jq -r '.zone_id')
-            record_type=$(echo "$record" | jq -r '.record_type')
-            proxied=$(echo "$record" | jq -r '.proxied')
-            ttl=$(echo "$record" | jq -r '.ttl | tonumber')
-            subdomain=$(echo "$record" | jq -r '.subdomain')
-            alternate_api_token=$(echo "$record" | jq -r '.alternate_api_token')
-
-            if [[ -z "$alternate_api_token" || "$alternate_api_token" = "null" || "$alternate_api_token" == "ALTERNATE_CLOUDFLARE_API_TOKEN" ]]; then
-                log_message "[info] No alternate API token speciefd using token from config or env variable."
-            else
-                record_token_status=$(test_api_token "$alternate_api_token")
-                log_message "$record_token_status"
-                if [[ "$record_token_status" != *"error"* ]]; then
-                    global_token=$API_TOKEN
-                    API_TOKEN=$alternate_api_token
-                    using_alt_token="true"
-                else
-                    log_message "[error] Alternate api token invalid, trying global token from config or env variable."
-                fi
-            fi
-
-            # Get DNS zone name
-            zone_name=$(get_zone_name)
-            if [[ "$zone_name" == *"error"* ]]; then
-                log_message "$zone_name"
-                log_message "[error] Failed to retrieve zone name for zoneid $zone_id, skipping record update."
-                continue
-            else
-                log_message "[info] Retrieved zone name for zoneid $zone_id: $zone_name"
-            fi
-
-            # Get DNS record value
-            dns_record_value=$(get_dns_record_value)
-            if [[ "$dns_record_value" == *"error"* ]]; then
-                log_message "$dns_record_value"
-                log_message "[error] Failed to retrieve DNS record value for record type $record_type in zone $zone_name, skipping record update."
-                continue
-            fi
-            IFS=" " read -r record_content record_id <<< "$dns_record_value"
-            if [ -z "$record_content" ] || [ "$record_content" = "null" ]; then
-                log_message "[error] Failed to retrieve DNS record value for record type $record_type in zone $zone_name, skipping record update."
-                continue
-            else
-                log_message "[info] Retrieved DNS record value for record ${subdomain:+"$subdomain."}$zone_name type $record_type in zone $zone_name: $record_content"
-            fi
-            # Check and update the record
-            case "$record_type" in
-                "A")
-                    check_and_update_record "$current_ipv4"
-                    for output in "$output1" "$output2"; do
-                        if [ -n "$output" ]; then
-                            log_message "$output"
-                        fi
-                    done
-                    ;;
-                "AAAA")
-                    if [[ "$ipv6" == *"true"* ]]; then
-                        check_and_update_record "$current_ipv6"
-                        for output in "$output1" "$output2"; do
-                            if [ -n "$output" ]; then
-                                log_message "$output"
-                            fi
-                        done
-                    else
-                        log_message "[warning] Container does not have an IPv6 address, skipping record."
-                    fi
-                    ;;
-                *)
-                    # Log if the record type is unsupported
-                    log_message "[error] Unsupported record type: $record_type, skipping update for ${subdomain:+"$subdomain."}$zone_name in Zone $zone_name."
-                    continue
-                    ;;
-            esac
-            if [[ "$using_alt_token" == *"true"* ]]; then
-                API_TOKEN=$global_token
-                using_alt_token="false"
-            fi
-        done
-    else
-        log_message "[error] Cloudflare API token not valid, exiting."
+    if ! test_api_token "$API_TOKEN"; then
+        log_message "[error] Global API token is invalid, exiting."
         exit 1
     fi
-    # Sleep for the specified interval before the next run
-    log_message "[info] End of the run, sleeping for $SLEEP_INTERVAL seconds."
-    sleep $SLEEP_INTERVAL
+    log_message "[info] API token validated."
+
+    # Fetch current public IPs
+    current_ipv4=""
+    if ! current_ipv4=$(get_public_ip v4); then
+        log_message "[warning] Could not determine public IPv4, skipping this run."
+        sleep "$SLEEP_INTERVAL" & wait $!
+        continue
+    fi
+    log_message "[info] Public IPv4: $current_ipv4"
+
+    current_ipv6=""
+    if [[ "$IPV6_AVAILABLE" == "true" ]]; then
+        if ! current_ipv6=$(get_public_ip v6); then
+            log_message "[warning] Could not determine public IPv6 this run."
+        else
+            log_message "[info] Public IPv6: $current_ipv6"
+        fi
+    fi
+
+    for record in "${RECORDS_CONFIG[@]}"; do
+        zone_id=$(jq -r '.zone_id'                         <<< "$record")
+        record_type=$(jq -r '.record_type'                 <<< "$record")
+        subdomain=$(jq -r '.subdomain // ""'               <<< "$record")
+        proxied=$(jq -r '.proxied // true'                 <<< "$record")
+        alt_token=$(jq -r '.alternate_api_token // ""'     <<< "$record")
+
+        # Validate and normalise TTL (must be a positive integer; default 1 = auto)
+        ttl_raw=$(jq -r '.ttl // 1' <<< "$record")
+        if [[ "$ttl_raw" =~ ^[0-9]+$ ]]; then
+            ttl="$ttl_raw"
+        else
+            log_message "[warning] Invalid TTL '$ttl_raw' for zone $zone_id, defaulting to 1."
+            ttl=1
+        fi
+
+        # Normalise proxied to a JSON boolean (handles both string and boolean input)
+        case "${proxied,,}" in
+            true)  proxied=true  ;;
+            false) proxied=false ;;
+            *)     proxied=true  ;;
+        esac
+
+        # Resolve which API token to use for this record
+        active_token="$API_TOKEN"
+        if [[ -n "$alt_token" && "$alt_token" != "null" && "$alt_token" != "ALTERNATE_CLOUDFLARE_API_TOKEN" ]]; then
+            if test_api_token "$alt_token" 2>/dev/null; then
+                active_token="$alt_token"
+                log_message "[info] Using alternate API token for zone $zone_id."
+            else
+                log_message "[warning] Alternate API token invalid for zone $zone_id, falling back to global token."
+            fi
+        fi
+
+        # Resolve zone name
+        zone_name=""
+        if ! zone_name=$(get_zone_name "$zone_id" "$active_token"); then
+            log_message "[error] Could not retrieve zone name for $zone_id, skipping record."
+            continue
+        fi
+        log_message "[info] Zone: $zone_name ($zone_id)"
+
+        full_name="${subdomain:+${subdomain}.}${zone_name}"
+
+        # Select the appropriate public IP for this record type
+        case "$record_type" in
+            A)
+                public_ip="$current_ipv4"
+                ;;
+            AAAA)
+                if [[ "$IPV6_AVAILABLE" != "true" || -z "$current_ipv6" ]]; then
+                    log_message "[warning] Skipping AAAA record $full_name: no IPv6 address available."
+                    continue
+                fi
+                public_ip="$current_ipv6"
+                ;;
+            *)
+                log_message "[error] Unsupported record type '$record_type' for $full_name, skipping."
+                continue
+                ;;
+        esac
+
+        # Fetch current DNS record value
+        dns_result=""
+        if ! dns_result=$(get_dns_record "$zone_id" "$record_type" "$full_name" "$active_token"); then
+            log_message "[error] Could not retrieve DNS record for $full_name ($record_type), skipping."
+            continue
+        fi
+        read -r record_content record_id <<< "$dns_result"
+        if [[ -z "$record_content" || "$record_content" == "null" ]]; then
+            log_message "[error] Empty DNS record returned for $full_name ($record_type), skipping."
+            continue
+        fi
+        log_message "[info] $full_name ($record_type): current=$record_content, public=$public_ip"
+
+        # Update only if the IP has changed
+        if [[ "$public_ip" == "$record_content" ]]; then
+            log_message "[info] $full_name ($record_type): no change, skipping update."
+        else
+            update_dns_record \
+                "$zone_id" "$record_id" "$full_name" "$record_type" \
+                "$public_ip" "$proxied" "$ttl" "$active_token"
+        fi
+    done
+
+    log_message "[info] Run complete. Sleeping ${SLEEP_INTERVAL}s."
+    # sleep in background + wait so SIGTERM/SIGINT is handled immediately
+    sleep "$SLEEP_INTERVAL" & wait $!
 done

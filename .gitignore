@@ -1,0 +1,14 @@
+# Sensitive config (never commit real tokens or zone IDs)
+config/
+
+# Log files
+*.log
+logs/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

@@ -1,28 +1,24 @@
-# lightweight base image
-FROM alpine:latest
+FROM alpine:3.21
 
-# Create log and config directory
-RUN mkdir -p /var/log/cloudflare-ddns
-RUN mkdir -p /config
-RUN mkdir -p /app
+LABEL org.opencontainers.image.title="Cloudflare DDNS" \
+      org.opencontainers.image.description="Automatically keeps Cloudflare DNS records in sync with your dynamic public IP" \
+      org.opencontainers.image.source="https://github.com/vandermerkprojects/cloudflare-ddns-container" \
+      org.opencontainers.image.licenses="GPL-3.0"
 
-# Copy the script files into the container
-COPY update_dns.sh cloudflare-ddns-config.yaml dns-records.json /app/
+RUN apk add --no-cache curl bash yq jq tzdata findutils iproute2 && \
+    mkdir -p /var/log/cloudflare-ddns /config /app && \
+    addgroup -S ddns && adduser -S -G ddns -u 1000 ddns && \
+    chown ddns:ddns /var/log/cloudflare-ddns /config /app
 
-# Make the script executable
+COPY --chown=ddns:ddns update_dns.sh cloudflare-ddns-config.yaml dns-records.json /app/
 RUN chmod +x /app/update_dns.sh
 
-# Install required packages
-RUN apk add --no-cache curl bash yq jq tzdata findutils
-
-# Set Timezone from ENV Variable
 ENV TZ="Europe/Amsterdam"
 
-# Set the working directory
+USER ddns
 WORKDIR /app
 
-# Setting Entrypoint
-ENTRYPOINT ["/bin/bash"]
+HEALTHCHECK --interval=5m --timeout=15s --start-period=30s --retries=3 \
+    CMD pgrep -f update_dns.sh > /dev/null || exit 1
 
-# Execute the script when the container starts
-CMD ["/app/update_dns.sh"]
+ENTRYPOINT ["/app/update_dns.sh"]
